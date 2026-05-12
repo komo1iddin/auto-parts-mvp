@@ -8,12 +8,13 @@ export default async function AdminOrdersPage({
 }) {
   const params = await searchParams;
   const status = params?.status ?? "";
-  const { orders, total } = await getOrdersList("admin", "", status, 100);
+  const { orders, total, statusCounts } = await getOrdersList("admin", "", status, 100);
 
   return (
     <OrdersList
       orders={orders}
       total={total}
+      statusCounts={statusCounts}
       status={status}
       basePath="/admin/orders"
       canShowCreator

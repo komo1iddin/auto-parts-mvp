@@ -9,12 +9,13 @@ export default async function ManagerOrdersPage({
 }) {
   const [user, params] = await Promise.all([getAuthUser(), searchParams]);
   const status = params?.status ?? "";
-  const { orders, total } = await getOrdersList("manager", user!.id, status, 100);
+  const { orders, total, statusCounts } = await getOrdersList("manager", user!.id, status, 100);
 
   return (
     <OrdersList
       orders={orders}
       total={total}
+      statusCounts={statusCounts}
       status={status}
       basePath="/manager/orders"
     />

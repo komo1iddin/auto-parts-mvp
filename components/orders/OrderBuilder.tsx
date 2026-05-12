@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -58,6 +58,8 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
   const [changeNote, setChangeNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const originalItems = useRef<OrderItem[]>(existingOrder?.items ?? []);
 
   const search = useCallback(async (query: string) => {
     if (!query.trim()) { setSearchResults([]); return; }
@@ -72,6 +74,12 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
     const t = setTimeout(() => search(q), 300);
     return () => clearTimeout(t);
   }, [q, search]);
+
+  const duplicateCodes = new Set(
+    items
+      .map((i) => i.partCode)
+      .filter((code, _, arr) => arr.filter((c) => c === code).length > 1)
+  );
 
   function addPart(part: Part) {
     const exists = items.find((i) => i.partId === part.id);
@@ -110,17 +118,54 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
     setItems((prev) => prev.map((i) => i.partId === partId ? { ...i, note } : i));
   }
 
+  function updateField<K extends keyof OrderItem>(partId: string, field: K, value: OrderItem[K]) {
+    setItems((prev) => prev.map((i) => i.partId === partId ? { ...i, [field]: value } : i));
+  }
+
   function removeItem(partId: string) {
     setItems((prev) => prev.filter((i) => i.partId !== partId));
+    setPendingDelete(null);
   }
 
   const totalSelling = items.reduce((s, i) => s + (i.sellingPriceCny ?? 0) * i.quantity, 0);
   const totalPurchase = items.reduce((s, i) => s + (i.purchasePriceCny ?? 0) * i.quantity, 0);
 
+  function buildChangelog(): string {
+    const orig = originalItems.current;
+    const lines: string[] = [];
+
+    for (const item of items) {
+      const old = orig.find((o) => o.partId === item.partId);
+      if (!old) {
+        lines.push(`+ ${item.partCode} qo'shildi (x${item.quantity})`);
+        continue;
+      }
+      const changes: string[] = [];
+      if (old.quantity !== item.quantity) changes.push(`miqdor ${old.quantity}→${item.quantity}`);
+      if (old.purchasePriceCny !== item.purchasePriceCny) changes.push(`xarid ¥${old.purchasePriceCny}→¥${item.purchasePriceCny}`);
+      if (old.sellingPriceCny !== item.sellingPriceCny) changes.push(`sotuv ¥${old.sellingPriceCny}→¥${item.sellingPriceCny}`);
+      if (old.type !== item.type) changes.push(`tur ${old.type}→${item.type}`);
+      if (old.supplierName !== item.supplierName) changes.push(`ta'minotchi "${old.supplierName}"→"${item.supplierName}"`);
+      if (changes.length) lines.push(`${item.partCode}: ${changes.join(", ")}`);
+    }
+
+    for (const old of orig) {
+      if (!items.find((i) => i.partId === old.partId)) {
+        lines.push(`- ${old.partCode} o'chirildi`);
+      }
+    }
+
+    return lines.join("; ") || "O'zgarishlar kiritildi";
+  }
+
   async function save() {
     if (!items.length) { setError("Kamida bitta qism kerak"); return; }
     setSaving(true);
     setError("");
+
+    const finalNote = existingOrder
+      ? (changeNote.trim() || buildChangelog())
+      : changeNote;
 
     const url = existingOrder ? `/api/orders/${existingOrder.id}` : "/api/orders";
     const method = existingOrder ? "PUT" : "POST";
@@ -128,7 +173,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items, status, changeNote }),
+      body: JSON.stringify({ items, status, changeNote: finalNote }),
     });
 
     const data = await res.json();
@@ -158,24 +203,32 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
           )}
           {searchResults.length > 0 && (
             <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-10 mt-1 max-h-64 overflow-y-auto">
-              {searchResults.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => addPart(p)}
-                  className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 flex items-center gap-3"
-                >
-                  <div className="flex-1">
-                    <span className="font-mono text-xs font-semibold text-gray-800">{p.code}</span>
-                    {p.name && <span className="text-gray-500 text-xs ml-2">{p.name}</span>}
-                    {p.brand && <span className="text-gray-400 text-xs ml-1">• {p.brand}</span>}
-                  </div>
-                  <span className="text-xs text-gray-400">{PART_TYPES[p.type]}</span>
-                  {p.sellingPriceCny && (
-                    <span className="text-xs font-medium text-blue-600">{formatCny(p.sellingPriceCny)}</span>
-                  )}
-                </button>
-              ))}
+              {searchResults.map((p) => {
+                const alreadyInOrder = items.some((i) => i.partCode === p.code);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => addPart(p)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 flex items-center gap-3"
+                  >
+                    <div className="flex-1">
+                      <span className="font-mono text-xs font-semibold text-gray-800">{p.code}</span>
+                      {p.name && <span className="text-gray-500 text-xs ml-2">{p.name}</span>}
+                      {p.brand && <span className="text-gray-400 text-xs ml-1">• {p.brand}</span>}
+                    </div>
+                    {alreadyInOrder && (
+                      <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-700">
+                        mavjud
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-400">{PART_TYPES[p.type]}</span>
+                    {p.sellingPriceCny && (
+                      <span className="text-xs font-medium text-blue-600">{formatCny(p.sellingPriceCny)}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -195,52 +248,125 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Kod</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Nomi</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Turi</th>
-                  {isAdmin && <th className="text-left px-4 py-3 text-gray-500 font-medium">Xarid (¥)</th>}
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Sotuv (¥)</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Miqdor</th>
-                  {isAdmin && <th className="text-left px-4 py-3 text-gray-500 font-medium">Ta'minotchi</th>}
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Izoh</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Kod</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Nomi</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Turi</th>
+                  {isAdmin && <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Xarid (¥)</th>}
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Sotuv (¥)</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Miqdor</th>
+                  {isAdmin && <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Ta'minotchi</th>}
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Izoh</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.partId} className="border-b border-gray-50">
-                    <td className="px-4 py-2 font-mono text-xs font-semibold">{item.partCode}</td>
+                  <tr key={item.partId} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs font-semibold">{item.partCode}</span>
+                        {duplicateCodes.has(item.partCode) && (
+                          <span
+                            title="Bu kod buyurtmada bir necha marta mavjud"
+                            className="rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-700"
+                          >
+                            2×
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-2 text-gray-700 text-xs">{item.partName || "—"}</td>
-                    <td className="px-4 py-2 text-xs text-gray-500">{PART_TYPES[item.type] ?? item.type}</td>
-                    {isAdmin && <td className="px-4 py-2 text-xs">{formatCny(item.purchasePriceCny)}</td>}
-                    <td className="px-4 py-2 text-xs">{formatCny(item.sellingPriceCny)}</td>
+                    <td className="px-4 py-2">
+                      <select
+                        value={item.type}
+                        onChange={(e) => updateField(item.partId, "type", e.target.value)}
+                        className="h-7 rounded border border-gray-200 bg-white px-1.5 text-xs text-gray-700 outline-none focus:border-blue-400"
+                      >
+                        {Object.entries(PART_TYPES).map(([k, v]) => (
+                          <option key={k} value={k}>{v}</option>
+                        ))}
+                      </select>
+                    </td>
+                    {isAdmin && (
+                      <td className="px-4 py-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={item.purchasePriceCny ?? ""}
+                          onChange={(e) => updateField(item.partId, "purchasePriceCny", e.target.value === "" ? null : Number(e.target.value))}
+                          className="h-7 w-20 text-xs"
+                          placeholder="0"
+                        />
+                      </td>
+                    )}
+                    <td className="px-4 py-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={item.sellingPriceCny ?? ""}
+                        onChange={(e) => updateField(item.partId, "sellingPriceCny", e.target.value === "" ? null : Number(e.target.value))}
+                        className="h-7 w-20 text-xs"
+                        placeholder="0"
+                      />
+                    </td>
                     <td className="px-4 py-2">
                       <Input
                         type="number"
                         min={1}
                         value={item.quantity}
                         onChange={(e) => updateQty(item.partId, Number(e.target.value))}
-                        className="h-8 w-16 text-center text-xs"
+                        className="h-7 w-16 text-center text-xs"
                       />
                     </td>
-                    {isAdmin && <td className="px-4 py-2 text-xs text-gray-500">{item.supplierName || "—"}</td>}
+                    {isAdmin && (
+                      <td className="px-4 py-2">
+                        <Input
+                          type="text"
+                          value={item.supplierName}
+                          onChange={(e) => updateField(item.partId, "supplierName", e.target.value)}
+                          placeholder="Ta'minotchi..."
+                          className="h-7 w-24 text-xs"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-2">
                       <Input
                         type="text"
                         value={item.note}
                         onChange={(e) => updateNote(item.partId, e.target.value)}
                         placeholder="Izoh..."
-                        className="h-8 w-28 text-xs"
+                        className="h-7 w-28 text-xs"
                       />
                     </td>
                     <td className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.partId)}
-                        className="text-red-400 hover:text-red-600 text-xs"
-                      >
-                        ✕
-                      </button>
+                      {pendingDelete === item.partId ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => removeItem(item.partId)}
+                            className="text-xs text-white bg-red-500 hover:bg-red-600 rounded px-2 py-0.5"
+                          >
+                            Ha
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPendingDelete(null)}
+                            className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded px-2 py-0.5"
+                          >
+                            Yo'q
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(item.partId)}
+                          className="text-red-400 hover:text-red-600 text-xs"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -279,14 +405,19 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
         </Select>
 
         {existingOrder && (
-          <Input
-            label="O'zgartirish izohi"
-            type="text"
-            value={changeNote}
-            onChange={(e) => setChangeNote(e.target.value)}
-            placeholder="Nima o'zgartirildi?"
-            className="max-w-sm"
-          />
+          <div className="space-y-1">
+            <Input
+              label="O'zgartirish izohi"
+              type="text"
+              value={changeNote}
+              onChange={(e) => setChangeNote(e.target.value)}
+              placeholder="Bo'sh qoldirsangiz, avtomatik to'ldiriladi"
+              className="max-w-sm"
+            />
+            <p className="text-xs text-gray-400">
+              Avtomat: {buildChangelog()}
+            </p>
+          </div>
         )}
       </div>
 
@@ -296,13 +427,49 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
         </p>
       )}
 
-      <div className="flex gap-3">
-        <Button onClick={save} disabled={saving || !items.length}>
-          {saving ? "Saqlanmoqda..." : existingOrder ? "Yangilash" : "Buyurtma yaratish"}
-        </Button>
-        <Button variant="secondary" onClick={() => router.push(redirectTo)}>
-          Bekor qilish
-        </Button>
+      {/* bottom padding so content isn't hidden behind sticky bar */}
+      <div className="h-20" />
+
+      {/* Sticky action bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white shadow-lg">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+          <div className="flex items-center gap-6 text-sm text-gray-600">
+            <span>
+              <span className="text-gray-400">Qismlar:</span>{" "}
+              <strong>{items.length}</strong>
+            </span>
+            <span>
+              <span className="text-gray-400">Miqdor:</span>{" "}
+              <strong>{items.reduce((s, i) => s + i.quantity, 0)}</strong>
+            </span>
+            {isAdmin && (
+              <span>
+                <span className="text-gray-400">Xarid:</span>{" "}
+                <strong className="text-red-600">{formatCny(totalPurchase)}</strong>
+              </span>
+            )}
+            <span>
+              <span className="text-gray-400">Sotuv:</span>{" "}
+              <strong className="text-green-600">{formatCny(totalSelling)}</strong>
+            </span>
+            {isAdmin && totalSelling > 0 && totalPurchase > 0 && (
+              <span>
+                <span className="text-gray-400">Foyda:</span>{" "}
+                <strong className={totalSelling - totalPurchase >= 0 ? "text-green-600" : "text-red-600"}>
+                  {formatCny(totalSelling - totalPurchase)}
+                </strong>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" onClick={() => router.push(redirectTo)}>
+              Bekor qilish
+            </Button>
+            <Button onClick={save} disabled={saving || !items.length}>
+              {saving ? "Saqlanmoqda..." : existingOrder ? "Yangilash" : "Buyurtma yaratish"}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

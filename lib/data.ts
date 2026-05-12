@@ -78,22 +78,56 @@ export const getOrdersList = unstable_cache(
       ...(role === "manager" ? { createdBy: userId } : {}),
     };
 
-    const [orders, total] = await Promise.all([
+    const baseWhere = {
+      ...(role === "manager" ? { createdBy: userId } : {}),
+    };
+
+    const [rawOrders, total, statusGroups] = await Promise.all([
       prisma.order.findMany({
         where,
         include: {
           creator: { select: { name: true } },
           updater: { select: { name: true } },
           _count: { select: { items: true } },
+          items: {
+            select: {
+              quantity: true,
+              purchasePriceCny: true,
+              sellingPriceCny: true,
+              supplierName: true,
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
         take,
         skip: 0,
       }),
       prisma.order.count({ where }),
+      prisma.order.groupBy({
+        by: ["status"],
+        where: baseWhere,
+        _count: { _all: true },
+      }),
     ]);
 
-    return { orders, total };
+    const orders = rawOrders.map((o) => ({
+      ...o,
+      totalQty: o.items.reduce((s, i) => s + i.quantity, 0),
+      totalPurchase: o.items.reduce((s, i) => s + Number(i.purchasePriceCny ?? 0) * i.quantity, 0),
+      totalSelling: o.items.reduce((s, i) => s + Number(i.sellingPriceCny ?? 0) * i.quantity, 0),
+      supplierNames: [...new Set(o.items.map((i) => i.supplierName).filter(Boolean))],
+      items: undefined,
+    }));
+
+    const statusCounts: Record<string, number> = {};
+    let allTotal = 0;
+    for (const g of statusGroups) {
+      statusCounts[g.status] = g._count._all;
+      allTotal += g._count._all;
+    }
+    statusCounts[""] = allTotal;
+
+    return { orders, total, statusCounts };
   },
   ["orders-list"],
   {
