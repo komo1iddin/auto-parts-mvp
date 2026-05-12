@@ -8,16 +8,19 @@ datasource db {
 }
 
 model User {
-  id        String   @id @db.Uuid
-  name      String
-  email     String   @unique
-  role      String   @default("client")
-  createdAt DateTime @default(now()) @map("created_at")
+  id                      String   @id @db.Uuid
+  name                    String
+  email                   String   @unique
+  role                    String   @default("client")
+  canCreateClientPayments Boolean  @default(false) @map("can_create_client_payments")
+  createdAt               DateTime @default(now()) @map("created_at")
 
   createdOrders Order[]         @relation("CreatedOrders")
   updatedOrders Order[]         @relation("UpdatedOrders")
   revisions     OrderRevision[]
   exports       OrderExport[]
+  clientPayments ClientPayment[]
+  supplierPayments SupplierPayment[]
 
   @@map("users")
 }
@@ -43,8 +46,9 @@ model Supplier {
   note      String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  parts   Part[]
-  exports OrderExport[]
+  parts    Part[]
+  exports  OrderExport[]
+  payments SupplierPayment[]
 
   @@map("suppliers")
 }
@@ -88,6 +92,8 @@ model Order {
   items     OrderItem[]
   revisions OrderRevision[]
   exports   OrderExport[]
+  clientPayments ClientPayment[]
+  supplierPayments SupplierPayment[]
 
   @@map("orders")
 }
@@ -146,4 +152,41 @@ model OrderExport {
   exporter User?     @relation(fields: [exportedBy], references: [id])
 
   @@map("order_exports")
+}
+
+model ClientPayment {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String   @map("order_id") @db.Uuid
+  amountCny     Decimal  @map("amount_cny") @db.Decimal(12, 2)
+  paymentDate   DateTime @map("payment_date") @db.Date
+  paymentMethod String   @map("payment_method")
+  note          String?
+  createdBy     String?  @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  creator User? @relation(fields: [createdBy], references: [id])
+
+  @@index([orderId])
+  @@map("client_payments")
+}
+
+model SupplierPayment {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String   @map("order_id") @db.Uuid
+  supplierId    String   @map("supplier_id") @db.Uuid
+  amountCny     Decimal  @map("amount_cny") @db.Decimal(12, 2)
+  paymentDate   DateTime @map("payment_date") @db.Date
+  paymentMethod String   @map("payment_method")
+  note          String?
+  createdBy     String?  @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+  creator  User?    @relation(fields: [createdBy], references: [id])
+
+  @@index([orderId])
+  @@index([supplierId])
+  @@map("supplier_payments")
 }

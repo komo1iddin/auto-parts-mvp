@@ -14,11 +14,15 @@ export async function PUT(
     return forbidden();
   }
   const { id } = await params;
-  const { name, role } = await req.json();
+  const { name, role, canCreateClientPayments } = await req.json();
 
   const user = await prisma.user.update({
     where: { id },
-    data: { name, role },
+    data: {
+      name,
+      role,
+      canCreateClientPayments: role === "manager" ? Boolean(canCreateClientPayments) : false,
+    },
   });
 
   // Update app_metadata in auth

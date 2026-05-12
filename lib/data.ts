@@ -107,10 +107,13 @@ export const getOrdersList = unstable_cache(
       ...STATUS_KEYS.map((s) => prisma.order.count({ where: { ...baseWhere, status: s } })),
     ]);
 
+    const isAdmin = role === "admin";
     const orders = rawOrders.map((o) => ({
       ...o,
       totalQty: o.items.reduce((s: number, i: { quantity: number }) => s + i.quantity, 0),
-      totalPurchase: o.items.reduce((s: number, i: { purchasePriceCny: unknown; quantity: number }) => s + Number(i.purchasePriceCny ?? 0) * i.quantity, 0),
+      totalPurchase: isAdmin
+        ? o.items.reduce((s: number, i: { purchasePriceCny: unknown; quantity: number }) => s + Number(i.purchasePriceCny ?? 0) * i.quantity, 0)
+        : undefined,
       totalSelling: o.items.reduce((s: number, i: { sellingPriceCny: unknown; quantity: number }) => s + Number(i.sellingPriceCny ?? 0) * i.quantity, 0),
       supplierNames: [...new Set(o.items.map((i: { supplierName: string | null }) => i.supplierName).filter(Boolean))],
       items: undefined,

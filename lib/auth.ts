@@ -10,6 +10,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: UserRole;
+  canCreateClientPayments: boolean;
 }
 
 export async function hasAuthSessionCookie() {
@@ -37,6 +38,7 @@ export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
     email: dbUser.email,
     name: dbUser.name,
     role: dbUser.role as UserRole,
+    canCreateClientPayments: dbUser.canCreateClientPayments,
   };
 });
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { CancelOrderButton } from "@/components/orders/CancelOrderButton";
@@ -52,6 +53,7 @@ interface OrderDetailViewProps {
   isAdmin: boolean;
   basePath: "/admin/orders" | "/manager/orders";
   exports: ExportRecord[];
+  financePanel?: ReactNode;
 }
 
 function toNumber(value: DetailItem["purchasePriceCny"]) {
@@ -98,7 +100,7 @@ function SummaryValue({ label, value, className }: { label: string; value: strin
   );
 }
 
-export function OrderDetailView({ order, isAdmin, basePath, exports }: OrderDetailViewProps) {
+export function OrderDetailView({ order, isAdmin, basePath, exports, financePanel }: OrderDetailViewProps) {
   const st = ORDER_STATUSES[order.status];
   const supplierNames = [...new Set(order.items.map((item) => item.supplierName).filter(Boolean))];
   const supplierIds = [...new Set(order.items.map((item) => item.supplierId).filter(Boolean))] as string[];
@@ -175,6 +177,8 @@ export function OrderDetailView({ order, isAdmin, basePath, exports }: OrderDeta
       </div>
 
       <ExportButtons orderId={order.id} supplierIds={isAdmin ? supplierIds : []} isAdmin={isAdmin} />
+
+      {financePanel}
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <div className="border-b border-gray-100 px-5 py-4">

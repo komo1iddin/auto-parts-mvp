@@ -12,6 +12,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  canCreateClientPayments: boolean;
   createdAt: string;
 }
 
@@ -26,7 +27,7 @@ export function UsersList({ users }: { users: User[] }) {
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "manager" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "manager", canCreateClientPayments: false });
   const [saving, setSaving] = useState(false);
 
   function refreshUsers() {
@@ -35,13 +36,19 @@ export function UsersList({ users }: { users: User[] }) {
 
   function openCreate() {
     setEditUser(null);
-    setForm({ name: "", email: "", password: "", role: "manager" });
+    setForm({ name: "", email: "", password: "", role: "manager", canCreateClientPayments: false });
     setOpen(true);
   }
 
   function openEdit(user: User) {
     setEditUser(user);
-    setForm({ name: user.name, email: user.email, password: "", role: user.role });
+    setForm({
+      name: user.name,
+      email: user.email,
+      password: "",
+      role: user.role,
+      canCreateClientPayments: user.canCreateClientPayments,
+    });
     setOpen(true);
   }
 
@@ -51,7 +58,11 @@ export function UsersList({ users }: { users: User[] }) {
       await fetch(`/api/users/${editUser.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, role: form.role }),
+        body: JSON.stringify({
+          name: form.name,
+          role: form.role,
+          canCreateClientPayments: form.canCreateClientPayments,
+        }),
       });
     } else {
       const res = await fetch("/api/users", {
@@ -104,15 +115,22 @@ export function UsersList({ users }: { users: User[] }) {
                 <td className="px-5 py-3 font-medium text-gray-800">{user.name}</td>
                 <td className="px-5 py-3 text-gray-500">{user.email}</td>
                 <td className="px-5 py-3">
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                    user.role === "admin"
-                      ? "bg-purple-100 text-purple-700"
-                      : user.role === "manager"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-gray-100 text-gray-600"
-                  }`}>
-                    {ROLES[user.role] ?? user.role}
-                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                      user.role === "admin"
+                        ? "bg-purple-100 text-purple-700"
+                        : user.role === "manager"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-600"
+                    }`}>
+                      {ROLES[user.role] ?? user.role}
+                    </span>
+                    {user.canCreateClientPayments && (
+                      <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                        Mijoz to'lovi
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-5 py-3 text-xs text-gray-400">
                   {new Date(user.createdAt).toLocaleDateString("uz")}
@@ -161,6 +179,17 @@ export function UsersList({ users }: { users: User[] }) {
             <option value="manager">Menejer</option>
             <option value="client">Mijoz</option>
           </Select>
+          {form.role === "manager" && (
+            <label className="flex items-center gap-2 rounded-md border border-gray-200 p-3 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.canCreateClientPayments}
+                onChange={(e) => setForm((f) => ({ ...f, canCreateClientPayments: e.target.checked }))}
+                className="size-4"
+              />
+              Mijoz to'lovlarini kiritish huquqi
+            </label>
+          )}
           <div className="flex gap-3 pt-2">
             <Button onClick={save} disabled={saving}>{saving ? "Saqlanmoqda..." : "Saqlash"}</Button>
             <Button variant="secondary" onClick={() => setOpen(false)}>Bekor</Button>

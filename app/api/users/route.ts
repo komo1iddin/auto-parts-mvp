@@ -21,7 +21,9 @@ export async function POST(req: NextRequest) {
     return forbidden();
   }
 
-  const { name, email, password, role } = await req.json();
+  const { name, email, password, role, canCreateClientPayments } = await req.json();
+  const nextRole = role ?? "manager";
+  const canCreatePayments = nextRole === "manager" ? Boolean(canCreateClientPayments) : false;
   if (!email || !password) {
     return Response.json({ error: "Email va parol majburiy" }, { status: 400 });
   }
@@ -31,7 +33,7 @@ export async function POST(req: NextRequest) {
     email,
     password,
     email_confirm: true,
-    app_metadata: { role: role ?? "manager" },
+    app_metadata: { role: nextRole },
     user_metadata: { name: name ?? email.split("@")[0] },
   });
 
@@ -42,12 +44,17 @@ export async function POST(req: NextRequest) {
   // Ensure user row exists (trigger may handle it, upsert for safety)
   await prisma.user.upsert({
     where: { id: data.user.id },
-    update: { name: name ?? email.split("@")[0], role: role ?? "manager" },
+    update: {
+      name: name ?? email.split("@")[0],
+      role: nextRole,
+      canCreateClientPayments: canCreatePayments,
+    },
     create: {
       id: data.user.id,
       email,
       name: name ?? email.split("@")[0],
-      role: role ?? "manager",
+      role: nextRole,
+      canCreateClientPayments: canCreatePayments,
     },
   });
 
