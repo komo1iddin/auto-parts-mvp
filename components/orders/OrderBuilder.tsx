@@ -321,7 +321,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = 
                     key={p.id}
                     type="button"
                     onClick={() => addPart(p)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 flex items-center gap-3"
+                    className="flex w-full cursor-pointer items-center gap-3 border-b border-gray-50 px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-blue-50"
                   >
                     <div className="flex-1 min-w-0">
                       <span className="font-mono text-xs font-semibold text-gray-800">{p.code}</span>

@@ -62,7 +62,7 @@ export function OrderBuilderBar({
             <button
               type="button"
               onClick={onUndo}
-              className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 transition-colors"
+              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-gray-700"
             >
               <Undo2 className="size-3" />
               Qaytarish
@@ -70,7 +70,7 @@ export function OrderBuilderBar({
             <button
               type="button"
               onClick={onDismissUndo}
-              className="text-gray-400 hover:text-gray-600"
+              className="cursor-pointer text-gray-400 transition-colors hover:text-gray-600"
             >
               <X className="size-3.5" />
             </button>

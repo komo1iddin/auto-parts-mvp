@@ -62,7 +62,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
             type="button"
             aria-label="Yopish"
             onClick={onClose}
-            className="inline-flex size-8 items-center justify-center rounded-md opacity-70 ring-offset-background transition-opacity hover:bg-accent hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md opacity-70 ring-offset-background transition-opacity hover:bg-accent hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <X className="size-4" />
           </button>

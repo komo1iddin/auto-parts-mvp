@@ -56,7 +56,7 @@ export function OrderTitleEditor({ orderId, title }: OrderTitleEditorProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group inline-flex max-w-full items-center gap-2 rounded-md text-left font-mono text-2xl font-bold text-gray-950 outline-none transition-colors hover:text-gray-700 focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="group -mx-1 inline-flex max-w-full cursor-pointer items-center gap-2 rounded-md px-1 text-left font-mono text-2xl font-bold text-gray-950 outline-none transition-colors hover:bg-gray-50 hover:text-gray-700 focus-visible:ring-3 focus-visible:ring-ring/50"
         title="Buyurtma ro'yxati nomini o'zgartirish"
       >
         <span className="truncate">{title}</span>
