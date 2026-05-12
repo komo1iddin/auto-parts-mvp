@@ -362,87 +362,101 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
                     <td className="px-4 py-2 text-gray-600 text-xs max-w-[120px] truncate">{item.partName || "—"}</td>
 
                     {/* Turi */}
-                    <td className="px-4 py-2 text-center">
-                      <TableSelect
-                        value={item.type}
-                        onChange={(v) => updateField(item.partId, "type", v)}
-                        options={typeOptions}
-                        width={96}
-                      />
+                    <td className="px-4 py-2">
+                      <div className="flex justify-center">
+                        <TableSelect
+                          value={item.type}
+                          onChange={(v) => updateField(item.partId, "type", v)}
+                          options={typeOptions}
+                          width={96}
+                        />
+                      </div>
                     </td>
 
                     {/* Xarid */}
                     {isAdmin && (
-                      <td className="px-4 py-2 text-center">
-                        <TableInput
-                          value={item.purchasePriceCny ?? ""}
-                          onChange={(v) => updateField(item.partId, "purchasePriceCny", v === "" ? null : Number(v))}
-                          width={72}
-                          placeholder="0"
-                        />
+                      <td className="px-4 py-2">
+                        <div className="flex justify-center">
+                          <TableInput
+                            value={item.purchasePriceCny ?? ""}
+                            onChange={(v) => updateField(item.partId, "purchasePriceCny", v === "" ? null : Number(v))}
+                            width={72}
+                            placeholder="0"
+                          />
+                        </div>
                       </td>
                     )}
 
                     {/* Sotuv */}
-                    <td className="px-4 py-2 text-center">
-                      <TableInput
-                        value={item.sellingPriceCny ?? ""}
-                        onChange={(v) => updateField(item.partId, "sellingPriceCny", v === "" ? null : Number(v))}
-                        width={72}
-                        placeholder="0"
-                      />
+                    <td className="px-4 py-2">
+                      <div className="flex justify-center">
+                        <TableInput
+                          value={item.sellingPriceCny ?? ""}
+                          onChange={(v) => updateField(item.partId, "sellingPriceCny", v === "" ? null : Number(v))}
+                          width={72}
+                          placeholder="0"
+                        />
+                      </div>
                     </td>
 
                     {/* Miqdor */}
-                    <td className="px-4 py-2 text-center">
-                      <TableInput
-                        value={item.quantity}
-                        onChange={(v) => updateQty(item.partId, Number(v))}
-                        width={56}
-                        center
-                      />
+                    <td className="px-4 py-2">
+                      <div className="flex justify-center">
+                        <TableInput
+                          value={item.quantity}
+                          onChange={(v) => updateQty(item.partId, Number(v))}
+                          width={56}
+                          center
+                        />
+                      </div>
                     </td>
 
                     {/* Ta'minotchi */}
                     {isAdmin && (
-                      <td className="px-4 py-2 text-center">
-                        <TableSelect
-                          value={item.supplierId}
-                          onChange={(v) => {
-                            const sup = suppliers.find((s) => s.id === v);
-                            updateField(item.partId, "supplierId", v);
-                            updateField(item.partId, "supplierName", sup?.name ?? "");
-                          }}
-                          options={supplierOptions}
-                          width={110}
-                        />
+                      <td className="px-4 py-2">
+                        <div className="flex justify-center">
+                          <TableSelect
+                            value={item.supplierId}
+                            onChange={(v) => {
+                              const sup = suppliers.find((s) => s.id === v);
+                              updateField(item.partId, "supplierId", v);
+                              updateField(item.partId, "supplierName", sup?.name ?? "");
+                            }}
+                            options={supplierOptions}
+                            width={96}
+                          />
+                        </div>
                       </td>
                     )}
 
                     {/* Izoh */}
-                    <td className="px-4 py-2 text-center">
-                      <input
-                        type="text"
-                        value={item.note}
-                        onChange={(e) => updateField(item.partId, "note", e.target.value)}
-                        placeholder="Izoh..."
-                        className={cn(
-                          "flex h-7 rounded-md border border-input bg-background px-2 py-0 text-xs shadow-xs transition-colors outline-none",
-                          "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50"
-                        )}
-                        style={{ width: 100 }}
-                      />
+                    <td className="px-4 py-2">
+                      <div className="flex justify-center">
+                        <input
+                          type="text"
+                          value={item.note}
+                          onChange={(e) => updateField(item.partId, "note", e.target.value)}
+                          placeholder="Izoh..."
+                          className={cn(
+                            "flex h-7 rounded-md border border-input bg-background px-2 py-0 text-xs shadow-xs transition-colors outline-none",
+                            "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50"
+                          )}
+                          style={{ width: 96 }}
+                        />
+                      </div>
                     </td>
 
                     {/* Delete */}
-                    <td className="px-3 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => confirmDelete(item)}
-                        className="inline-flex items-center justify-center size-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      >
-                        <X className="size-3.5" />
-                      </button>
+                    <td className="px-3 py-2">
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => confirmDelete(item)}
+                          className="inline-flex items-center justify-center size-7 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -454,15 +468,16 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
 
       {/* Options */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <Select
-          label="Holat"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="w-48"
-        >
-          <option value="draft">Qoralama</option>
-          <option value="confirmed">Tasdiqlangan</option>
-        </Select>
+        <div className="w-48">
+          <Select
+            label="Holat"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="draft">Qoralama</option>
+            <option value="confirmed">Tasdiqlangan</option>
+          </Select>
+        </div>
 
         {existingOrder && (
           <div className="space-y-1">
