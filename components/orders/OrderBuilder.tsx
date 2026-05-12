@@ -2,10 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
+import { Modal } from "@/components/ui/Modal";
 import { PART_TYPES, formatCny } from "@/lib/utils";
+
+interface Supplier {
+  id: string;
+  name: string;
+}
 
 interface Part {
   id: string;
@@ -18,8 +24,6 @@ interface Part {
   wholesalePriceCny?: string | null;
   category?: { name: string } | null;
   supplier?: { id: string; name: string } | null;
-  supplierName?: string;
-  supplierId?: string;
 }
 
 interface OrderItem {
@@ -48,6 +52,9 @@ interface OrderBuilderProps {
   redirectTo: string;
 }
 
+const cellInput =
+  "h-7 w-full rounded border border-gray-200 bg-white px-2 text-xs text-gray-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100";
+
 export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilderProps) {
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -58,8 +65,15 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
   const [changeNote, setChangeNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<OrderItem | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const originalItems = useRef<OrderItem[]>(existingOrder?.items ?? []);
+
+  useEffect(() => {
+    fetch("/api/suppliers")
+      .then((r) => r.json())
+      .then((d) => setSuppliers(d.suppliers ?? []));
+  }, []);
 
   const search = useCallback(async (query: string) => {
     if (!query.trim()) { setSearchResults([]); return; }
@@ -110,36 +124,33 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
   }
 
   function updateQty(partId: string, qty: number) {
-    if (qty < 1) { removeItem(partId); return; }
+    if (qty < 1) return;
     setItems((prev) => prev.map((i) => i.partId === partId ? { ...i, quantity: qty } : i));
-  }
-
-  function updateNote(partId: string, note: string) {
-    setItems((prev) => prev.map((i) => i.partId === partId ? { ...i, note } : i));
   }
 
   function updateField<K extends keyof OrderItem>(partId: string, field: K, value: OrderItem[K]) {
     setItems((prev) => prev.map((i) => i.partId === partId ? { ...i, [field]: value } : i));
   }
 
+  function confirmDelete(item: OrderItem) {
+    setDeleteTarget(item);
+  }
+
   function removeItem(partId: string) {
     setItems((prev) => prev.filter((i) => i.partId !== partId));
-    setPendingDelete(null);
+    setDeleteTarget(null);
   }
 
   const totalSelling = items.reduce((s, i) => s + (i.sellingPriceCny ?? 0) * i.quantity, 0);
   const totalPurchase = items.reduce((s, i) => s + (i.purchasePriceCny ?? 0) * i.quantity, 0);
+  const totalQty = items.reduce((s, i) => s + i.quantity, 0);
 
   function buildChangelog(): string {
     const orig = originalItems.current;
     const lines: string[] = [];
-
     for (const item of items) {
       const old = orig.find((o) => o.partId === item.partId);
-      if (!old) {
-        lines.push(`+ ${item.partCode} qo'shildi (x${item.quantity})`);
-        continue;
-      }
+      if (!old) { lines.push(`+ ${item.partCode} qo'shildi (x${item.quantity})`); continue; }
       const changes: string[] = [];
       if (old.quantity !== item.quantity) changes.push(`miqdor ${old.quantity}→${item.quantity}`);
       if (old.purchasePriceCny !== item.purchasePriceCny) changes.push(`xarid ¥${old.purchasePriceCny}→¥${item.purchasePriceCny}`);
@@ -148,13 +159,9 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
       if (old.supplierName !== item.supplierName) changes.push(`ta'minotchi "${old.supplierName}"→"${item.supplierName}"`);
       if (changes.length) lines.push(`${item.partCode}: ${changes.join(", ")}`);
     }
-
     for (const old of orig) {
-      if (!items.find((i) => i.partId === old.partId)) {
-        lines.push(`- ${old.partCode} o'chirildi`);
-      }
+      if (!items.find((i) => i.partId === old.partId)) lines.push(`- ${old.partCode} o'chirildi`);
     }
-
     return lines.join("; ") || "O'zgarishlar kiritildi";
   }
 
@@ -162,27 +169,16 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
     if (!items.length) { setError("Kamida bitta qism kerak"); return; }
     setSaving(true);
     setError("");
-
-    const finalNote = existingOrder
-      ? (changeNote.trim() || buildChangelog())
-      : changeNote;
-
+    const finalNote = existingOrder ? (changeNote.trim() || buildChangelog()) : changeNote;
     const url = existingOrder ? `/api/orders/${existingOrder.id}` : "/api/orders";
     const method = existingOrder ? "PUT" : "POST";
-
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ items, status, changeNote: finalNote }),
     });
-
     const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Xatolik yuz berdi");
-      setSaving(false);
-      return;
-    }
-
+    if (!res.ok) { setError(data.error ?? "Xatolik yuz berdi"); setSaving(false); return; }
     router.push(redirectTo);
     router.refresh();
   }
@@ -192,15 +188,13 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
       {/* Search */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <h2 className="font-semibold text-gray-800 mb-3">Qism qidirish</h2>
-        <div className="relative">
+        <div className="relative max-w-sm">
           <Input
             placeholder="Qism kodi, nomi yoki brend..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
-          {searching && (
-            <p className="text-xs text-gray-400 mt-1">Qidirilmoqda...</p>
-          )}
+          {searching && <p className="text-xs text-gray-400 mt-1">Qidirilmoqda...</p>}
           {searchResults.length > 0 && (
             <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-10 mt-1 max-h-64 overflow-y-auto">
               {searchResults.map((p) => {
@@ -212,19 +206,19 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
                     onClick={() => addPart(p)}
                     className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 flex items-center gap-3"
                   >
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <span className="font-mono text-xs font-semibold text-gray-800">{p.code}</span>
                       {p.name && <span className="text-gray-500 text-xs ml-2">{p.name}</span>}
                       {p.brand && <span className="text-gray-400 text-xs ml-1">• {p.brand}</span>}
                     </div>
                     {alreadyInOrder && (
-                      <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-700">
+                      <span className="shrink-0 rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-700">
                         mavjud
                       </span>
                     )}
-                    <span className="text-xs text-gray-400">{PART_TYPES[p.type]}</span>
+                    <span className="shrink-0 text-xs text-gray-400">{PART_TYPES[p.type]}</span>
                     {p.sellingPriceCny && (
-                      <span className="text-xs font-medium text-blue-600">{formatCny(p.sellingPriceCny)}</span>
+                      <span className="shrink-0 text-xs font-medium text-blue-600">{formatCny(p.sellingPriceCny)}</span>
                     )}
                   </button>
                 );
@@ -248,125 +242,134 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Kod</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs whitespace-nowrap">Kod</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Nomi</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Turi</th>
-                  {isAdmin && <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Xarid (¥)</th>}
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Sotuv (¥)</th>
+                  {isAdmin && <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs whitespace-nowrap">Xarid (¥)</th>}
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs whitespace-nowrap">Sotuv (¥)</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Miqdor</th>
-                  {isAdmin && <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Ta'minotchi</th>}
+                  {isAdmin && <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs whitespace-nowrap">Ta'minotchi</th>}
                   <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Izoh</th>
-                  <th></th>
+                  <th className="w-8" />
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
                   <tr key={item.partId} className="border-b border-gray-50 hover:bg-gray-50/50">
-                    <td className="px-4 py-2">
+                    {/* Kod — whitespace-nowrap so it never wraps */}
+                    <td className="px-4 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs font-semibold">{item.partCode}</span>
+                        <span className="font-mono text-xs font-semibold text-gray-800">{item.partCode}</span>
                         {duplicateCodes.has(item.partCode) && (
                           <span
                             title="Bu kod buyurtmada bir necha marta mavjud"
-                            className="rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-700"
+                            className="shrink-0 rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-700"
                           >
                             2×
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-2 text-gray-700 text-xs">{item.partName || "—"}</td>
+                    <td className="px-4 py-2 text-gray-700 text-xs max-w-[120px] truncate">{item.partName || "—"}</td>
+
+                    {/* Turi */}
                     <td className="px-4 py-2">
                       <select
                         value={item.type}
                         onChange={(e) => updateField(item.partId, "type", e.target.value)}
-                        className="h-7 rounded border border-gray-200 bg-white px-1.5 text-xs text-gray-700 outline-none focus:border-blue-400"
+                        className={cellInput}
+                        style={{ width: 90 }}
                       >
                         {Object.entries(PART_TYPES).map(([k, v]) => (
                           <option key={k} value={k}>{v}</option>
                         ))}
                       </select>
                     </td>
+
+                    {/* Xarid narxi */}
                     {isAdmin && (
                       <td className="px-4 py-2">
-                        <Input
+                        <input
                           type="number"
                           min={0}
                           step={0.01}
                           value={item.purchasePriceCny ?? ""}
                           onChange={(e) => updateField(item.partId, "purchasePriceCny", e.target.value === "" ? null : Number(e.target.value))}
-                          className="h-7 w-20 text-xs"
+                          className={cellInput}
+                          style={{ width: 72 }}
                           placeholder="0"
                         />
                       </td>
                     )}
+
+                    {/* Sotuv narxi */}
                     <td className="px-4 py-2">
-                      <Input
+                      <input
                         type="number"
                         min={0}
                         step={0.01}
                         value={item.sellingPriceCny ?? ""}
                         onChange={(e) => updateField(item.partId, "sellingPriceCny", e.target.value === "" ? null : Number(e.target.value))}
-                        className="h-7 w-20 text-xs"
+                        className={cellInput}
+                        style={{ width: 72 }}
                         placeholder="0"
                       />
                     </td>
+
+                    {/* Miqdor */}
                     <td className="px-4 py-2">
-                      <Input
+                      <input
                         type="number"
                         min={1}
                         value={item.quantity}
                         onChange={(e) => updateQty(item.partId, Number(e.target.value))}
-                        className="h-7 w-16 text-center text-xs"
+                        className={`${cellInput} text-center`}
+                        style={{ width: 56 }}
                       />
                     </td>
+
+                    {/* Ta'minotchi — select */}
                     {isAdmin && (
                       <td className="px-4 py-2">
-                        <Input
-                          type="text"
-                          value={item.supplierName}
-                          onChange={(e) => updateField(item.partId, "supplierName", e.target.value)}
-                          placeholder="Ta'minotchi..."
-                          className="h-7 w-24 text-xs"
-                        />
+                        <select
+                          value={item.supplierId}
+                          onChange={(e) => {
+                            const sup = suppliers.find((s) => s.id === e.target.value);
+                            updateField(item.partId, "supplierId", e.target.value);
+                            updateField(item.partId, "supplierName", sup?.name ?? "");
+                          }}
+                          className={cellInput}
+                          style={{ width: 110 }}
+                        >
+                          <option value="">—</option>
+                          {suppliers.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
                       </td>
                     )}
+
+                    {/* Izoh */}
                     <td className="px-4 py-2">
-                      <Input
+                      <input
                         type="text"
                         value={item.note}
-                        onChange={(e) => updateNote(item.partId, e.target.value)}
+                        onChange={(e) => updateField(item.partId, "note", e.target.value)}
                         placeholder="Izoh..."
-                        className="h-7 w-28 text-xs"
+                        className={cellInput}
+                        style={{ width: 100 }}
                       />
                     </td>
-                    <td className="px-4 py-2">
-                      {pendingDelete === item.partId ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item.partId)}
-                            className="text-xs text-white bg-red-500 hover:bg-red-600 rounded px-2 py-0.5"
-                          >
-                            Ha
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPendingDelete(null)}
-                            className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded px-2 py-0.5"
-                          >
-                            Yo'q
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setPendingDelete(item.partId)}
-                          className="text-red-400 hover:text-red-600 text-xs"
-                        >
-                          ✕
-                        </button>
-                      )}
+
+                    {/* Delete */}
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => confirmDelete(item)}
+                        className="flex items-center justify-center size-6 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <X className="size-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -374,35 +377,22 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
             </table>
           </div>
         )}
-
-        {items.length > 0 && (
-          <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex gap-6 text-sm">
-            <span className="text-gray-600">
-              Jami miqdor: <strong>{items.reduce((s, i) => s + i.quantity, 0)}</strong>
-            </span>
-            {isAdmin && (
-              <span className="text-gray-600">
-                Xarid jami: <strong className="text-red-600">{formatCny(totalPurchase)}</strong>
-              </span>
-            )}
-            <span className="text-gray-600">
-              Sotuv jami: <strong className="text-green-600">{formatCny(totalSelling)}</strong>
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Options */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <Select
-          label="Holat"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="max-w-xs"
-        >
+        <div className="w-48">
+          <label className="text-sm font-medium text-foreground mb-1 block">Holat</label>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="flex h-9 w-full appearance-none rounded-md border border-input bg-transparent px-3 py-1 pr-8 text-sm shadow-xs outline-none focus-visible:border-ring"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}
+          >
             <option value="draft">Qoralama</option>
             <option value="confirmed">Tasdiqlangan</option>
-        </Select>
+          </select>
+        </div>
 
         {existingOrder && (
           <div className="space-y-1">
@@ -414,9 +404,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
               placeholder="Bo'sh qoldirsangiz, avtomatik to'ldiriladi"
               className="max-w-sm"
             />
-            <p className="text-xs text-gray-400">
-              Avtomat: {buildChangelog()}
-            </p>
+            <p className="text-xs text-gray-400">Avtomat: {buildChangelog()}</p>
           </div>
         )}
       </div>
@@ -430,9 +418,9 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
       {/* bottom padding so content isn't hidden behind sticky bar */}
       <div className="h-20" />
 
-      {/* Sticky action bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white shadow-lg">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+      {/* Sticky action bar — left-64 matches sidebar w-64 */}
+      <div className="fixed bottom-0 left-64 right-0 z-40 border-t border-gray-200 bg-white shadow-lg">
+        <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-6 text-sm text-gray-600">
             <span>
               <span className="text-gray-400">Qismlar:</span>{" "}
@@ -440,7 +428,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
             </span>
             <span>
               <span className="text-gray-400">Miqdor:</span>{" "}
-              <strong>{items.reduce((s, i) => s + i.quantity, 0)}</strong>
+              <strong>{totalQty}</strong>
             </span>
             {isAdmin && (
               <span>
@@ -452,7 +440,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
               <span className="text-gray-400">Sotuv:</span>{" "}
               <strong className="text-green-600">{formatCny(totalSelling)}</strong>
             </span>
-            {isAdmin && totalSelling > 0 && totalPurchase > 0 && (
+            {isAdmin && (totalSelling > 0 || totalPurchase > 0) && (
               <span>
                 <span className="text-gray-400">Foyda:</span>{" "}
                 <strong className={totalSelling - totalPurchase >= 0 ? "text-green-600" : "text-red-600"}>
@@ -471,6 +459,40 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Qismni o'chirish"
+        className="max-w-sm"
+      >
+        {deleteTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Quyidagi qismni buyurtmadan o'chirasizmi?
+            </p>
+            <div className="rounded-lg bg-gray-50 px-4 py-3 text-sm">
+              <div className="font-mono font-semibold text-gray-800">{deleteTarget.partCode}</div>
+              {deleteTarget.partName && (
+                <div className="text-gray-500 text-xs mt-0.5">{deleteTarget.partName}</div>
+              )}
+              <div className="text-gray-400 text-xs mt-1">Miqdor: {deleteTarget.quantity}</div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
+                Bekor qilish
+              </Button>
+              <Button
+                onClick={() => removeItem(deleteTarget.partId)}
+                className="bg-red-500 hover:bg-red-600 text-white border-red-500"
+              >
+                O'chirish
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
