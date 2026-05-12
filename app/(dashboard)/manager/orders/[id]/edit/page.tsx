@@ -27,6 +27,7 @@ export default async function ManagerEditOrderPage({
       <OrderBuilder
         isAdmin={false}
         redirectTo={`/manager/orders/${id}`}
+        ordersPath="/manager/orders"
         existingOrder={{
           id: order.id,
           status: order.status,

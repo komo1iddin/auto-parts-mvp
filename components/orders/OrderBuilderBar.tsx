@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Undo2 } from "lucide-react";
+import { ArrowLeft, X, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatCny } from "@/lib/utils";
 
@@ -28,6 +28,7 @@ interface Props {
   saving: boolean;
   isEdit: boolean;
   onCancel: () => void;
+  onBackToOrders: () => void;
   onSave: () => void;
 }
 
@@ -43,6 +44,7 @@ export function OrderBuilderBar({
   saving,
   isEdit,
   onCancel,
+  onBackToOrders,
   onSave,
 }: Props) {
   const profit = totalSelling - totalPurchase;
@@ -108,6 +110,12 @@ export function OrderBuilderBar({
             )}
           </div>
           <div className="flex items-center gap-3">
+            {isEdit && (
+              <Button variant="outline" onClick={onBackToOrders}>
+                <ArrowLeft className="size-4" />
+                Buyurtmalar
+              </Button>
+            )}
             <Button variant="secondary" onClick={onCancel}>
               Bekor qilish
             </Button>

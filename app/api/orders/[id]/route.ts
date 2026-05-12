@@ -145,6 +145,65 @@ export async function PUT(
   return Response.json({ order: updated });
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  let user;
+  try {
+    user = await requireAdminOrManager();
+  } catch {
+    return unauthorized();
+  }
+
+  const { id } = await params;
+  const { currentOrderNumber } = await req.json();
+  const nextName = String(currentOrderNumber ?? "").trim();
+
+  if (!nextName) {
+    return Response.json({ error: "Buyurtma nomi bo'sh bo'lishi mumkin emas" }, { status: 400 });
+  }
+
+  const existing = await prisma.order.findUnique({ where: { id } });
+  if (!existing) return Response.json({ error: "Topilmadi" }, { status: 404 });
+
+  if (user.role === "manager" && existing.createdBy !== user.id) {
+    return Response.json({ error: "Ruxsat yo'q" }, { status: 403 });
+  }
+
+  if (existing.currentOrderNumber === nextName) {
+    return Response.json({ order: existing });
+  }
+
+  const duplicate = await prisma.order.findUnique({ where: { currentOrderNumber: nextName } });
+  if (duplicate && duplicate.id !== id) {
+    return Response.json({ error: "Bu nomdagi buyurtma allaqachon mavjud" }, { status: 409 });
+  }
+
+  const updated = await prisma.order.update({
+    where: { id },
+    data: {
+      baseOrderNumber: nextName,
+      currentOrderNumber: nextName,
+      updatedBy: user.id,
+    },
+  });
+
+  await prisma.orderRevision.create({
+    data: {
+      orderId: id,
+      version: existing.version,
+      oldOrderNumber: existing.currentOrderNumber,
+      newOrderNumber: nextName,
+      changedBy: user.id,
+      changeNote: `Buyurtma nomi "${existing.currentOrderNumber}" dan "${nextName}" ga o'zgartirildi`,
+    },
+  });
+
+  revalidateAppData("orders");
+  return Response.json({ order: updated });
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

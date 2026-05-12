@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FileSpreadsheet, Languages, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 interface ExportButtonsProps {
@@ -59,8 +60,10 @@ export function ExportButtons({ orderId, supplierIds, isAdmin = true }: ExportBu
           variant="secondary"
           onClick={() => doExport("internal")}
           disabled={loading === "internal--"}
+          title="Ichki Excel: barcha qatorlar, xarid/sotuv narxlari, ta'minotchi va izohlar kiradi; hech narsa yashirilmaydi."
         >
-          📊 Ichki Excel
+          <Table2 className="size-4" />
+          Ichki Excel
         </Button>
 
         {isAdmin && (
@@ -70,16 +73,20 @@ export function ExportButtons({ orderId, supplierIds, isAdmin = true }: ExportBu
               variant="secondary"
               onClick={() => exportAllSuppliers("cn")}
               disabled={loading?.startsWith("supplier-cn")}
+              title="CN Excel: ta'minotchiga kerakli kod, nom, brend, tur, miqdor, xarid narxi va izoh kiradi; sotuv narxi, foyda va ichki ma'lumotlar yashiriladi."
             >
-              🇨🇳 Ta'minotchi Excel (CN)
+              <FileSpreadsheet className="size-4" />
+              Ta'minotchi Excel (CN)
             </Button>
             <Button
               size="sm"
               variant="secondary"
               onClick={() => exportAllSuppliers("en")}
               disabled={loading?.startsWith("supplier-en")}
+              title="EN Excel: ta'minotchiga kerakli kod, nom, brend, tur, miqdor, xarid narxi va izoh kiradi; sotuv narxi, foyda va ichki ma'lumotlar yashiriladi."
             >
-              🇬🇧 Ta'minotchi Excel (EN)
+              <Languages className="size-4" />
+              Ta'minotchi Excel (EN)
             </Button>
           </>
         )}

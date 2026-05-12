@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { SelectField } from "@/components/ui/SelectField";
+import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { PART_TYPES, formatCny } from "@/lib/utils";
 import { OrderItemsTable } from "./OrderItemsTable";
@@ -52,9 +52,16 @@ interface OrderBuilderProps {
     status: string;
   };
   redirectTo: string;
+  ordersPath?: string;
 }
 
-export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilderProps) {
+type PendingNavigation = { type: "href"; href: string } | { type: "back" };
+
+function serializeItems(items: OrderItem[]) {
+  return JSON.stringify(items);
+}
+
+export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = redirectTo }: OrderBuilderProps) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [searchResults, setSearchResults] = useState<Part[]>([]);
@@ -67,8 +74,26 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
   const [deleteTarget, setDeleteTarget] = useState<OrderItem | null>(null);
   const [undoState, setUndoState] = useState<{ item: OrderItem; index: number } | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [leavePromptOpen, setLeavePromptOpen] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
   const originalItems = useRef<OrderItem[]>(existingOrder?.items ?? []);
+  const originalStatus = useRef(existingOrder?.status ?? "draft");
+  const initialItemsSnapshot = useRef(serializeItems(existingOrder?.items ?? []));
+  const savedNavigation = useRef(false);
+  const isDirtyRef = useRef(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isDirty = useMemo(() => {
+    return (
+      serializeItems(items) !== initialItemsSnapshot.current ||
+      status !== originalStatus.current ||
+      changeNote.trim().length > 0
+    );
+  }, [items, status, changeNote]);
+
+  useEffect(() => {
+    isDirtyRef.current = isDirty;
+  }, [isDirty]);
 
   useEffect(() => {
     fetch("/api/suppliers")
@@ -180,7 +205,76 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
     return lines.join("; ") || "O'zgarishlar kiritildi";
   }
 
-  async function save() {
+  const requestNavigation = useCallback((next: PendingNavigation) => {
+    if (!existingOrder || !isDirtyRef.current || savedNavigation.current) {
+      if (next.type === "href") router.push(next.href);
+      else window.history.back();
+      return;
+    }
+
+    setPendingNavigation(next);
+    setLeavePromptOpen(true);
+  }, [existingOrder, router]);
+
+  function closeLeavePrompt() {
+    setLeavePromptOpen(false);
+    setPendingNavigation(null);
+  }
+
+  function leaveAnyway() {
+    if (!pendingNavigation) return;
+    savedNavigation.current = true;
+    setLeavePromptOpen(false);
+    if (pendingNavigation.type === "href") router.push(pendingNavigation.href);
+    else window.history.back();
+  }
+
+  useEffect(() => {
+    if (!existingOrder) return;
+
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirtyRef.current || savedNavigation.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    const documentClick = (event: MouseEvent) => {
+      if (!isDirtyRef.current || savedNavigation.current || event.defaultPrevented) return;
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+      const target = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(target instanceof HTMLAnchorElement)) return;
+      if (target.target && target.target !== "_self") return;
+      if (target.hasAttribute("download")) return;
+
+      const url = new URL(target.href, window.location.href);
+      if (url.origin !== window.location.origin || url.href === window.location.href) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      requestNavigation({ type: "href", href: `${url.pathname}${url.search}${url.hash}` });
+    };
+
+    const popState = () => {
+      if (!isDirtyRef.current || savedNavigation.current) return;
+      window.history.pushState(null, "", window.location.href);
+      requestNavigation({ type: "back" });
+    };
+
+    window.history.replaceState(window.history.state, "", window.location.href);
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("beforeunload", beforeUnload);
+    window.addEventListener("popstate", popState);
+    document.addEventListener("click", documentClick, true);
+
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      window.removeEventListener("popstate", popState);
+      document.removeEventListener("click", documentClick, true);
+    };
+  }, [existingOrder, requestNavigation]);
+
+  async function save(destination?: PendingNavigation) {
     if (!items.length) { setError("Kamida bitta qism kerak"); return; }
     setSaving(true);
     setError("");
@@ -194,8 +288,16 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
     });
     const data = await res.json();
     if (!res.ok) { setError(data.error ?? "Xatolik yuz berdi"); setSaving(false); return; }
-    router.push(redirectTo);
+    savedNavigation.current = true;
+    if (destination?.type === "href") router.push(destination.href);
+    else if (destination?.type === "back") window.history.back();
+    else router.push(redirectTo);
     router.refresh();
+  }
+
+  function saveAndLeave() {
+    if (!pendingNavigation) return;
+    void save(pendingNavigation);
   }
 
   return (
@@ -255,14 +357,14 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
       {/* Options */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
         <div className="w-48">
-          <SelectField
+          <Select
             label="Holat"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="draft">Qoralama</option>
             <option value="confirmed">Tasdiqlangan</option>
-          </SelectField>
+          </Select>
         </div>
 
         {existingOrder && (
@@ -299,8 +401,9 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
         onDismissUndo={() => setUndoState(null)}
         saving={saving}
         isEdit={!!existingOrder}
-        onCancel={() => router.push(redirectTo)}
-        onSave={save}
+        onCancel={() => requestNavigation({ type: "href", href: redirectTo })}
+        onBackToOrders={() => requestNavigation({ type: "href", href: ordersPath })}
+        onSave={() => void save()}
       />
 
       {/* Delete confirmation modal */}
@@ -332,6 +435,31 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={leavePromptOpen}
+        onClose={closeLeavePrompt}
+        title="Saqlanmagan o'zgarishlar"
+        className="max-w-sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Bu sahifada saqlanmagan o'zgarishlar bor. Saqlab chiqasizmi yoki baribir chiqasizmi?
+          </p>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={closeLeavePrompt} disabled={saving}>
+              Qolish
+            </Button>
+            <Button variant="outline" onClick={leaveAnyway} disabled={saving}>
+              Baribir chiqish
+            </Button>
+            <Button onClick={saveAndLeave} disabled={saving || !items.length}>
+              {saving ? "Saqlanmoqda..." : "Saqlash"}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

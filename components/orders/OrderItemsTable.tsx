@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, ChevronDown, X } from "lucide-react";
 import { cn, PART_TYPES } from "@/lib/utils";
 
 interface OrderItem {
@@ -45,21 +46,50 @@ function TableSelect({
   options: { value: string; label: string }[];
   width: number;
 }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected = options.find((option) => option.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
   return (
-    <div className="relative" style={{ width }}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+    <div ref={rootRef} className="relative" style={{ width }}>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
         className={cn(
-          "flex h-7 w-full appearance-none rounded-md border border-input bg-background px-2 py-0 pr-6 text-xs shadow-xs transition-colors outline-none",
+          "flex h-8 w-full items-center justify-between rounded-md border border-input bg-white px-3 text-sm shadow-xs transition-colors outline-none",
           "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50"
         )}
       >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+        <span className="truncate">{selected?.label ?? "—"}</span>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-2 min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white p-1 shadow-xl ring-1 ring-black/10">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-100"
+            >
+              <span>{option.label}</span>
+              {option.value === value && <Check className="size-4" />}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -70,24 +100,45 @@ function TableInput({
   width,
   center,
   placeholder,
+  step = 0.01,
 }: {
   value: string | number;
   onChange: (v: string) => void;
   width: number;
   center?: boolean;
   placeholder?: string;
+  step?: number;
 }) {
+  const [draft, setDraft] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setDraft(String(value));
+  }, [focused, value]);
+
   return (
     <input
       type="number"
       min={0}
-      step={0.01}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
+      step={step}
+      value={draft}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        onChange(e.target.value);
+      }}
+      onFocus={(e) => {
+        setFocused(true);
+        e.currentTarget.select();
+      }}
+      onBlur={() => {
+        setFocused(false);
+        setDraft(String(value));
+      }}
       placeholder={placeholder ?? "0"}
       className={cn(
-        "flex h-7 rounded-md border border-input bg-background px-2 py-0 text-xs shadow-xs transition-colors outline-none",
+        "flex h-8 rounded-md border border-input bg-background px-2 py-0 text-center text-sm shadow-xs transition-colors outline-none [appearance:textfield]",
         "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50",
+        "[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
         center && "text-center"
       )}
       style={{ width }}
@@ -117,7 +168,7 @@ export function OrderItemsTable({ items, isAdmin, suppliers, duplicateCodes, upd
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Kod</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Nomi</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Nomi</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Turi</th>
                 {isAdmin && <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 whitespace-nowrap">Xarid (¥)</th>}
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 whitespace-nowrap">Sotuv (¥)</th>
@@ -131,9 +182,9 @@ export function OrderItemsTable({ items, isAdmin, suppliers, duplicateCodes, upd
               {items.map((item) => (
                 <tr key={item.partId} className="border-b border-gray-50 hover:bg-gray-50/50">
                   {/* Kod */}
-                  <td className="px-4 py-2.5 whitespace-nowrap">
+                  <td className="px-4 py-2.5 align-middle whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-sm text-gray-800">{item.partCode}</span>
+                      <span className="text-sm text-gray-800">{item.partCode}</span>
                       {duplicateCodes.has(item.partCode) && (
                         <span
                           title="Bu kod buyurtmada bir necha marta mavjud"
@@ -146,28 +197,28 @@ export function OrderItemsTable({ items, isAdmin, suppliers, duplicateCodes, upd
                   </td>
 
                   {/* Nomi */}
-                  <td className="px-4 py-2.5 text-gray-600 text-sm max-w-[140px] truncate">{item.partName || "—"}</td>
+                  <td className="px-4 py-2.5 text-center align-middle text-gray-600 text-sm max-w-[140px] truncate">{item.partName || "—"}</td>
 
                   {/* Turi */}
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 align-middle">
                     <div className="flex justify-center">
                       <TableSelect
                         value={item.type}
                         onChange={(v) => updateField(item.partId, "type", v)}
                         options={typeOptions}
-                        width={96}
+                        width={112}
                       />
                     </div>
                   </td>
 
                   {/* Xarid */}
                   {isAdmin && (
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 align-middle">
                       <div className="flex justify-center">
                         <TableInput
                           value={item.purchasePriceCny ?? ""}
                           onChange={(v) => updateField(item.partId, "purchasePriceCny", v === "" ? null : Number(v))}
-                          width={72}
+                          width={80}
                           placeholder="0"
                         />
                       </div>
@@ -175,32 +226,33 @@ export function OrderItemsTable({ items, isAdmin, suppliers, duplicateCodes, upd
                   )}
 
                   {/* Sotuv */}
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 align-middle">
                     <div className="flex justify-center">
                       <TableInput
                         value={item.sellingPriceCny ?? ""}
                         onChange={(v) => updateField(item.partId, "sellingPriceCny", v === "" ? null : Number(v))}
-                        width={72}
+                        width={80}
                         placeholder="0"
                       />
                     </div>
                   </td>
 
                   {/* Miqdor */}
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 align-middle">
                     <div className="flex justify-center">
                       <TableInput
                         value={item.quantity}
-                        onChange={(v) => updateQty(item.partId, Number(v))}
-                        width={56}
+                        onChange={(v) => updateQty(item.partId, v === "" ? 0 : Number(v))}
+                        width={64}
                         center
+                        step={1}
                       />
                     </div>
                   </td>
 
                   {/* Ta'minotchi */}
                   {isAdmin && (
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 align-middle">
                       <div className="flex justify-center">
                         <TableSelect
                           value={item.supplierId}
@@ -210,14 +262,14 @@ export function OrderItemsTable({ items, isAdmin, suppliers, duplicateCodes, upd
                             updateField(item.partId, "supplierName", sup?.name ?? "");
                           }}
                           options={supplierOptions}
-                          width={96}
+                          width={128}
                         />
                       </div>
                     </td>
                   )}
 
                   {/* Izoh */}
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 align-middle">
                     <div className="flex justify-center">
                       <input
                         type="text"
@@ -225,7 +277,7 @@ export function OrderItemsTable({ items, isAdmin, suppliers, duplicateCodes, upd
                         onChange={(e) => updateField(item.partId, "note", e.target.value)}
                         placeholder="Izoh..."
                         className={cn(
-                          "flex h-7 rounded-md border border-input bg-background px-2 py-0 text-xs shadow-xs transition-colors outline-none",
+                          "flex h-8 rounded-md border border-input bg-background px-2 py-0 text-sm shadow-xs transition-colors outline-none",
                           "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50"
                         )}
                         style={{ width: 96 }}
@@ -234,7 +286,7 @@ export function OrderItemsTable({ items, isAdmin, suppliers, duplicateCodes, upd
                   </td>
 
                   {/* Delete */}
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 align-middle">
                     <div className="flex justify-center">
                       <button
                         type="button"
