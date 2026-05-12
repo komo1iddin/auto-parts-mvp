@@ -1,7 +1,6 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { PartForm } from "@/components/parts/PartForm";
@@ -21,6 +20,11 @@ interface Part {
   wholesalePriceCny?: string | null;
   sellingPriceCny: string | null;
   imageUrl: string | null;
+  note?: string | null;
+  categoryId?: string | null;
+  supplierId?: string | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
   category?: { name: string } | null;
   supplier?: { name: string } | null;
 }
@@ -42,6 +46,9 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(q);
   const [createOpen, setCreateOpen] = useState(false);
+  const [viewPart, setViewPart] = useState<Part | null>(null);
+  const [editPart, setEditPart] = useState<Part | null>(null);
+  const [imagePreview, setImagePreview] = useState<Part | null>(null);
   const [isPending, startTransition] = useTransition();
   const pageCount = Math.max(1, Math.ceil(total / take));
   const currentPage = Math.min(page, pageCount);
@@ -72,6 +79,14 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
     startTransition(() => router.refresh());
   }
 
+  function openViewPart(part: Part) {
+    setViewPart(part);
+  }
+
+  function openEditPart(part: Part) {
+    setEditPart(part);
+  }
+
   function updateParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(updates)) {
@@ -84,6 +99,12 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
 
   function handleCreateSuccess() {
     setCreateOpen(false);
+    updateParams({ page: null });
+    startTransition(() => router.refresh());
+  }
+
+  function handleEditSuccess() {
+    setEditPart(null);
     startTransition(() => router.refresh());
   }
 
@@ -106,12 +127,13 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-gray-100 p-4 md:flex-row md:items-center md:justify-between">
-          <Input
-            placeholder={isAdmin ? "Qism kodi, nomi yoki brend bo'yicha qidirish..." : "Qism kodi, nomi yoki brend..."}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="max-w-sm"
-          />
+          <div className="w-full md:max-w-2xl md:flex-1">
+            <Input
+              placeholder={isAdmin ? "Qism kodi, nomi yoki brend bo'yicha qidirish..." : "Qism kodi, nomi yoki brend..."}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             {isPending && <span className="text-xs text-muted-foreground">Yangilanmoqda...</span>}
             <div className="flex items-center gap-2">
@@ -155,7 +177,13 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
               {parts.map((part) => (
                 <tr key={part.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="px-4 py-3 font-mono text-xs font-semibold text-gray-800">
-                    {part.code}
+                    <button
+                      type="button"
+                      onClick={() => openViewPart(part)}
+                      className="rounded-sm text-left font-mono font-semibold text-blue-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    >
+                      {part.code}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-gray-700">{part.name ?? "-"}</td>
                   <td className="px-4 py-3 text-gray-500">{part.category?.name ?? "-"}</td>
@@ -177,9 +205,13 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
                   {isAdmin && (
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        <Link prefetch={false} href={`/admin/parts/${part.id}/edit`}>
-                          <Button variant="ghost" size="sm">Tahrirlash</Button>
-                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditPart(part)}
+                        >
+                          Tahrirlash
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -252,6 +284,141 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
           />
         </Modal>
       )}
+
+      <Modal
+        open={Boolean(viewPart)}
+        onClose={() => setViewPart(null)}
+        title={viewPart ? `Qism: ${viewPart.code}` : "Qism ma'lumotlari"}
+        className="max-w-2xl"
+      >
+        {viewPart && (
+          <PartDetails
+            part={viewPart}
+            isAdmin={isAdmin}
+            onImageOpen={() => setImagePreview(viewPart)}
+          />
+        )}
+      </Modal>
+
+      {isAdmin && (
+        <Modal
+          open={Boolean(editPart)}
+          onClose={() => setEditPart(null)}
+          title={editPart ? `Qismni tahrirlash: ${editPart.code}` : "Qismni tahrirlash"}
+          className="max-w-3xl"
+        >
+          {editPart && (
+            <PartForm
+              mode="edit"
+              defaultValues={{
+                id: editPart.id,
+                code: editPart.code,
+                name: editPart.name ?? "",
+                categoryId: editPart.categoryId ?? "",
+                brand: editPart.brand ?? "",
+                type: editPart.type,
+                purchasePriceCny: editPart.purchasePriceCny?.toString() ?? "",
+                wholesalePriceCny: editPart.wholesalePriceCny?.toString() ?? "",
+                sellingPriceCny: editPart.sellingPriceCny?.toString() ?? "",
+                supplierId: editPart.supplierId ?? "",
+                categoryName: editPart.category?.name ?? "",
+                supplierName: editPart.supplier?.name ?? "",
+                imageUrl: editPart.imageUrl ?? "",
+                note: editPart.note ?? "",
+              }}
+              onSuccess={handleEditSuccess}
+              onCancel={() => setEditPart(null)}
+              className="space-y-5"
+            />
+          )}
+        </Modal>
+      )}
+
+      <Modal
+        open={Boolean(imagePreview)}
+        onClose={() => setImagePreview(null)}
+        title={imagePreview ? `Rasm: ${imagePreview.code}` : "Rasm"}
+        className="max-w-4xl"
+      >
+        {imagePreview?.imageUrl && (
+          <div className="rounded-lg bg-gray-50 p-3">
+            <img
+              src={imagePreview.imageUrl}
+              alt={imagePreview.name ?? imagePreview.code}
+              className="max-h-[70vh] w-full object-contain"
+            />
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function PartDetails({
+  part,
+  isAdmin,
+  onImageOpen,
+}: {
+  part: Part;
+  isAdmin: boolean;
+  onImageOpen: () => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <DetailItem label="Kod" value={part.code} mono />
+        <DetailItem label="Nomi" value={part.name} />
+        <DetailItem label="Kategoriya" value={part.category?.name} />
+        <DetailItem label="Brend" value={part.brand} />
+        <DetailItem label="Turi" value={PART_TYPES[part.type] ?? part.type} />
+        <DetailItem label="Sotuv narxi" value={formatCny(part.sellingPriceCny)} />
+        {isAdmin && <DetailItem label="Xarid narxi" value={formatCny(part.purchasePriceCny)} />}
+        {isAdmin && <DetailItem label="Ulgurji narx" value={formatCny(part.wholesalePriceCny)} />}
+        {isAdmin && <DetailItem label="Ta'minotchi" value={part.supplier?.name} />}
+      </div>
+
+      {part.imageUrl && (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Rasm</p>
+          <button
+            type="button"
+            onClick={onImageOpen}
+            className="mt-2 flex w-full items-center gap-3 rounded-md border border-gray-100 bg-gray-50 p-2 text-left transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <img src={part.imageUrl} alt={part.name ?? part.code} className="size-16 shrink-0 rounded-md border bg-white object-cover" />
+            <span>
+              <span className="block text-sm font-medium text-gray-800">Rasmni ko'rish</span>
+              <span className="mt-1 block text-xs text-gray-500">Kattaroq ko'rish uchun bosing</span>
+            </span>
+          </button>
+        </div>
+      )}
+
+      {isAdmin && part.note && (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Izoh</p>
+          <p className="mt-1 rounded-md bg-gray-50 p-3 text-sm text-gray-700">{part.note}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailItem({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value?: string | number | null;
+  mono?: boolean;
+}) {
+  return (
+    <div className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
+      <p className={mono ? "mt-1 font-mono text-sm font-semibold text-gray-800" : "mt-1 text-sm text-gray-800"}>
+        {value || "—"}
+      </p>
     </div>
   );
 }

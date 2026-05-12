@@ -133,7 +133,7 @@ export const getPartsList = unstable_cache(
       prisma.part.findMany({
         where,
         include: { category: true, supplier: true },
-        orderBy: { code: "asc" },
+        orderBy: { createdAt: "desc" },
         take,
         skip,
       }),

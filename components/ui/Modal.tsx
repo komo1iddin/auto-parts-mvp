@@ -12,14 +12,34 @@ interface ModalProps {
   className?: string;
 }
 
+let openModalCount = 0;
+let originalBodyOverflow = "";
+let originalBodyPaddingRight = "";
+
 export function Modal({ open, onClose, title, children, className }: ModalProps) {
   useEffect(() => {
     if (!open) return;
+    if (openModalCount === 0) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      originalBodyOverflow = document.body.style.overflow;
+      originalBodyPaddingRight = document.body.style.paddingRight;
+      document.body.style.overflow = "hidden";
+      if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+    openModalCount += 1;
+
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("keydown", handler);
+      openModalCount = Math.max(0, openModalCount - 1);
+      if (openModalCount === 0) {
+        document.body.style.overflow = originalBodyOverflow;
+        document.body.style.paddingRight = originalBodyPaddingRight;
+      }
+    };
   }, [open, onClose]);
 
   if (!open) return null;
