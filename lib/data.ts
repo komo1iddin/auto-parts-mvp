@@ -81,8 +81,9 @@ export const getOrdersList = unstable_cache(
     const baseWhere = {
       ...(role === "manager" ? { createdBy: userId } : {}),
     };
+    const STATUS_KEYS = ["draft", "confirmed", "updated", "cancelled"] as const;
 
-    const [rawOrders, total, statusGroups] = await Promise.all([
+    const [rawOrders, total, ...statusCountsArr] = await Promise.all([
       prisma.order.findMany({
         where,
         include: {
@@ -103,29 +104,21 @@ export const getOrdersList = unstable_cache(
         skip: 0,
       }),
       prisma.order.count({ where }),
-      prisma.order.groupBy({
-        by: ["status"],
-        where: baseWhere,
-        _count: { _all: true },
-      }),
+      ...STATUS_KEYS.map((s) => prisma.order.count({ where: { ...baseWhere, status: s } })),
     ]);
 
     const orders = rawOrders.map((o) => ({
       ...o,
-      totalQty: o.items.reduce((s, i) => s + i.quantity, 0),
-      totalPurchase: o.items.reduce((s, i) => s + Number(i.purchasePriceCny ?? 0) * i.quantity, 0),
-      totalSelling: o.items.reduce((s, i) => s + Number(i.sellingPriceCny ?? 0) * i.quantity, 0),
-      supplierNames: [...new Set(o.items.map((i) => i.supplierName).filter(Boolean))],
+      totalQty: o.items.reduce((s: number, i: { quantity: number }) => s + i.quantity, 0),
+      totalPurchase: o.items.reduce((s: number, i: { purchasePriceCny: unknown; quantity: number }) => s + Number(i.purchasePriceCny ?? 0) * i.quantity, 0),
+      totalSelling: o.items.reduce((s: number, i: { sellingPriceCny: unknown; quantity: number }) => s + Number(i.sellingPriceCny ?? 0) * i.quantity, 0),
+      supplierNames: [...new Set(o.items.map((i: { supplierName: string | null }) => i.supplierName).filter(Boolean))],
       items: undefined,
     }));
 
     const statusCounts: Record<string, number> = {};
-    let allTotal = 0;
-    for (const g of statusGroups) {
-      statusCounts[g.status] = g._count._all;
-      allTotal += g._count._all;
-    }
-    statusCounts[""] = allTotal;
+    STATUS_KEYS.forEach((s, idx) => { statusCounts[s] = statusCountsArr[idx] as number; });
+    statusCounts[""] = STATUS_KEYS.reduce((sum, s) => sum + (statusCounts[s] ?? 0), 0);
 
     return { orders, total, statusCounts };
   },
