@@ -1,0 +1,122 @@
+"use client";
+
+import { X, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { formatCny } from "@/lib/utils";
+
+interface OrderItem {
+  partId: string;
+  partCode: string;
+  partName: string;
+  quantity: number;
+}
+
+interface UndoState {
+  item: OrderItem;
+  index: number;
+}
+
+interface Props {
+  itemCount: number;
+  totalQty: number;
+  totalPurchase: number;
+  totalSelling: number;
+  isAdmin: boolean;
+  undoState: UndoState | null;
+  onUndo: () => void;
+  onDismissUndo: () => void;
+  saving: boolean;
+  isEdit: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+}
+
+export function OrderBuilderBar({
+  itemCount,
+  totalQty,
+  totalPurchase,
+  totalSelling,
+  isAdmin,
+  undoState,
+  onUndo,
+  onDismissUndo,
+  saving,
+  isEdit,
+  onCancel,
+  onSave,
+}: Props) {
+  const profit = totalSelling - totalPurchase;
+
+  return (
+    <>
+      {/* Undo toast */}
+      {undoState && (
+        <div className="fixed bottom-20 left-64 right-0 z-50 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-lg text-sm">
+            <span className="text-gray-600">
+              <span className="font-mono font-semibold text-gray-800">{undoState.item.partCode}</span>{" "}
+              o'chirildi
+            </span>
+            <button
+              type="button"
+              onClick={onUndo}
+              className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 transition-colors"
+            >
+              <Undo2 className="size-3" />
+              Qaytarish
+            </button>
+            <button
+              type="button"
+              onClick={onDismissUndo}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky action bar — left-64 matches sidebar w-64 */}
+      <div className="fixed bottom-0 left-64 right-0 z-40 border-t border-gray-200 bg-white shadow-lg">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+          <div className="flex items-center gap-6 text-sm text-gray-600">
+            <span>
+              <span className="text-gray-400">Qismlar:</span>{" "}
+              <strong>{itemCount}</strong>
+            </span>
+            <span>
+              <span className="text-gray-400">Miqdor:</span>{" "}
+              <strong>{totalQty}</strong>
+            </span>
+            {isAdmin && (
+              <span>
+                <span className="text-gray-400">Xarid:</span>{" "}
+                <strong className="text-red-600">{formatCny(totalPurchase)}</strong>
+              </span>
+            )}
+            <span>
+              <span className="text-gray-400">Sotuv:</span>{" "}
+              <strong className="text-green-600">{formatCny(totalSelling)}</strong>
+            </span>
+            {isAdmin && (totalSelling > 0 || totalPurchase > 0) && (
+              <span>
+                <span className="text-gray-400">Foyda:</span>{" "}
+                <strong className={profit >= 0 ? "text-blue-600" : "text-red-600"}>
+                  {formatCny(profit)}
+                </strong>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" onClick={onCancel}>
+              Bekor qilish
+            </Button>
+            <Button onClick={onSave} disabled={saving || itemCount === 0}>
+              {saving ? "Saqlanmoqda..." : isEdit ? "Yangilash" : "Buyurtma yaratish"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, X, Undo2 } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
+import { SelectField } from "@/components/ui/SelectField";
 import { Modal } from "@/components/ui/Modal";
-import { cn, PART_TYPES, formatCny } from "@/lib/utils";
+import { PART_TYPES, formatCny } from "@/lib/utils";
+import { OrderItemsTable } from "./OrderItemsTable";
+import { OrderBuilderBar } from "./OrderBuilderBar";
 
 interface Supplier {
   id: string;
@@ -27,7 +28,7 @@ interface Part {
   supplier?: { id: string; name: string } | null;
 }
 
-interface OrderItem {
+export interface OrderItem {
   partId: string;
   partCode: string;
   partName: string;
@@ -53,69 +54,6 @@ interface OrderBuilderProps {
   redirectTo: string;
 }
 
-/** Inline select for table cells — shadcn style, no label wrapper */
-function TableSelect({
-  value,
-  onChange,
-  options,
-  width,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  width: number;
-}) {
-  return (
-    <div className="relative" style={{ width }}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          "flex h-7 w-full appearance-none rounded-md border border-input bg-background px-2 py-0 pr-6 text-xs shadow-xs transition-colors outline-none",
-          "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50"
-        )}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
-    </div>
-  );
-}
-
-/** Inline number input for table cells */
-function TableInput({
-  value,
-  onChange,
-  width,
-  center,
-  placeholder,
-}: {
-  value: string | number;
-  onChange: (v: string) => void;
-  width: number;
-  center?: boolean;
-  placeholder?: string;
-}) {
-  return (
-    <input
-      type="number"
-      min={0}
-      step={0.01}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder ?? "0"}
-      className={cn(
-        "flex h-7 rounded-md border border-input bg-background px-2 py-0 text-xs shadow-xs transition-colors outline-none",
-        "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50",
-        center && "text-center"
-      )}
-      style={{ width }}
-    />
-  );
-}
-
 export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilderProps) {
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -138,7 +76,6 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
       .then((d) => setSuppliers(d.suppliers ?? []));
   }, []);
 
-  // Auto-dismiss undo toast after 6s
   useEffect(() => {
     if (!undoState) return;
     if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -193,17 +130,12 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
   }
 
   function updateQty(partId: string, qty: number) {
-    // Never auto-delete on quantity change — user must use X button explicitly
     const safe = Math.max(0, Math.floor(qty));
     setItems((prev) => prev.map((i) => i.partId === partId ? { ...i, quantity: safe } : i));
   }
 
   function updateField<K extends keyof OrderItem>(partId: string, field: K, value: OrderItem[K]) {
     setItems((prev) => prev.map((i) => i.partId === partId ? { ...i, [field]: value } : i));
-  }
-
-  function confirmDelete(item: OrderItem) {
-    setDeleteTarget(item);
   }
 
   function removeItem(partId: string) {
@@ -266,12 +198,6 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
     router.refresh();
   }
 
-  const typeOptions = Object.entries(PART_TYPES).map(([k, v]) => ({ value: k, label: v }));
-  const supplierOptions = [
-    { value: "", label: "—" },
-    ...suppliers.map((s) => ({ value: s.id, label: s.name })),
-  ];
-
   return (
     <div className="space-y-6">
       {/* Search */}
@@ -316,167 +242,27 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
       </div>
 
       {/* Items table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800">Buyurtma qismlari</h2>
-          <span className="text-sm text-gray-500">{items.length} ta qism</span>
-        </div>
-
-        {items.length === 0 ? (
-          <p className="p-12 text-center text-gray-400">Hali qism qo'shilmagan</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 whitespace-nowrap">Kod</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Nomi</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Turi</th>
-                  {isAdmin && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 whitespace-nowrap">Xarid (¥)</th>}
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 whitespace-nowrap">Sotuv (¥)</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Miqdor</th>
-                  {isAdmin && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 whitespace-nowrap">Ta'minotchi</th>}
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Izoh</th>
-                  <th className="w-10" />
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.partId} className="border-b border-gray-50 hover:bg-gray-50/50">
-                    {/* Kod */}
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs font-semibold text-gray-800">{item.partCode}</span>
-                        {duplicateCodes.has(item.partCode) && (
-                          <span
-                            title="Bu kod buyurtmada bir necha marta mavjud"
-                            className="shrink-0 rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-700"
-                          >
-                            2×
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Nomi */}
-                    <td className="px-4 py-2 text-gray-600 text-xs max-w-[120px] truncate">{item.partName || "—"}</td>
-
-                    {/* Turi */}
-                    <td className="px-4 py-2">
-                      <div className="flex justify-center">
-                        <TableSelect
-                          value={item.type}
-                          onChange={(v) => updateField(item.partId, "type", v)}
-                          options={typeOptions}
-                          width={96}
-                        />
-                      </div>
-                    </td>
-
-                    {/* Xarid */}
-                    {isAdmin && (
-                      <td className="px-4 py-2">
-                        <div className="flex justify-center">
-                          <TableInput
-                            value={item.purchasePriceCny ?? ""}
-                            onChange={(v) => updateField(item.partId, "purchasePriceCny", v === "" ? null : Number(v))}
-                            width={72}
-                            placeholder="0"
-                          />
-                        </div>
-                      </td>
-                    )}
-
-                    {/* Sotuv */}
-                    <td className="px-4 py-2">
-                      <div className="flex justify-center">
-                        <TableInput
-                          value={item.sellingPriceCny ?? ""}
-                          onChange={(v) => updateField(item.partId, "sellingPriceCny", v === "" ? null : Number(v))}
-                          width={72}
-                          placeholder="0"
-                        />
-                      </div>
-                    </td>
-
-                    {/* Miqdor */}
-                    <td className="px-4 py-2">
-                      <div className="flex justify-center">
-                        <TableInput
-                          value={item.quantity}
-                          onChange={(v) => updateQty(item.partId, Number(v))}
-                          width={56}
-                          center
-                        />
-                      </div>
-                    </td>
-
-                    {/* Ta'minotchi */}
-                    {isAdmin && (
-                      <td className="px-4 py-2">
-                        <div className="flex justify-center">
-                          <TableSelect
-                            value={item.supplierId}
-                            onChange={(v) => {
-                              const sup = suppliers.find((s) => s.id === v);
-                              updateField(item.partId, "supplierId", v);
-                              updateField(item.partId, "supplierName", sup?.name ?? "");
-                            }}
-                            options={supplierOptions}
-                            width={96}
-                          />
-                        </div>
-                      </td>
-                    )}
-
-                    {/* Izoh */}
-                    <td className="px-4 py-2">
-                      <div className="flex justify-center">
-                        <input
-                          type="text"
-                          value={item.note}
-                          onChange={(e) => updateField(item.partId, "note", e.target.value)}
-                          placeholder="Izoh..."
-                          className={cn(
-                            "flex h-7 rounded-md border border-input bg-background px-2 py-0 text-xs shadow-xs transition-colors outline-none",
-                            "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50"
-                          )}
-                          style={{ width: 96 }}
-                        />
-                      </div>
-                    </td>
-
-                    {/* Delete */}
-                    <td className="px-3 py-2">
-                      <div className="flex justify-center">
-                        <button
-                          type="button"
-                          onClick={() => confirmDelete(item)}
-                          className="inline-flex items-center justify-center size-7 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        >
-                          <X className="size-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <OrderItemsTable
+        items={items}
+        isAdmin={isAdmin}
+        suppliers={suppliers}
+        duplicateCodes={duplicateCodes}
+        updateField={updateField}
+        updateQty={updateQty}
+        onDelete={(item) => setDeleteTarget(item)}
+      />
 
       {/* Options */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
         <div className="w-48">
-          <Select
+          <SelectField
             label="Holat"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="draft">Qoralama</option>
             <option value="confirmed">Tasdiqlangan</option>
-          </Select>
+          </SelectField>
         </div>
 
         {existingOrder && (
@@ -502,74 +288,20 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
 
       <div className="h-20" />
 
-      {/* Undo toast */}
-      {undoState && (
-        <div className="fixed bottom-20 left-64 right-0 z-50 flex justify-center pointer-events-none">
-          <div className="pointer-events-auto flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-lg text-sm">
-            <span className="text-gray-600">
-              <span className="font-mono font-semibold text-gray-800">{undoState.item.partCode}</span>{" "}
-              o'chirildi
-            </span>
-            <button
-              type="button"
-              onClick={undoDelete}
-              className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 transition-colors"
-            >
-              <Undo2 className="size-3" />
-              Qaytarish
-            </button>
-            <button
-              type="button"
-              onClick={() => setUndoState(null)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="size-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Sticky action bar — left-64 matches sidebar w-64 */}
-      <div className="fixed bottom-0 left-64 right-0 z-40 border-t border-gray-200 bg-white shadow-lg">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-6 text-sm text-gray-600">
-            <span>
-              <span className="text-gray-400">Qismlar:</span>{" "}
-              <strong>{items.length}</strong>
-            </span>
-            <span>
-              <span className="text-gray-400">Miqdor:</span>{" "}
-              <strong>{totalQty}</strong>
-            </span>
-            {isAdmin && (
-              <span>
-                <span className="text-gray-400">Xarid:</span>{" "}
-                <strong className="text-red-600">{formatCny(totalPurchase)}</strong>
-              </span>
-            )}
-            <span>
-              <span className="text-gray-400">Sotuv:</span>{" "}
-              <strong className="text-green-600">{formatCny(totalSelling)}</strong>
-            </span>
-            {isAdmin && (totalSelling > 0 || totalPurchase > 0) && (
-              <span>
-                <span className="text-gray-400">Foyda:</span>{" "}
-                <strong className={totalSelling - totalPurchase >= 0 ? "text-green-600" : "text-red-600"}>
-                  {formatCny(totalSelling - totalPurchase)}
-                </strong>
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={() => router.push(redirectTo)}>
-              Bekor qilish
-            </Button>
-            <Button onClick={save} disabled={saving || !items.length}>
-              {saving ? "Saqlanmoqda..." : existingOrder ? "Yangilash" : "Buyurtma yaratish"}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <OrderBuilderBar
+        itemCount={items.length}
+        totalQty={totalQty}
+        totalPurchase={totalPurchase}
+        totalSelling={totalSelling}
+        isAdmin={isAdmin}
+        undoState={undoState}
+        onUndo={undoDelete}
+        onDismissUndo={() => setUndoState(null)}
+        saving={saving}
+        isEdit={!!existingOrder}
+        onCancel={() => router.push(redirectTo)}
+        onSave={save}
+      />
 
       {/* Delete confirmation modal */}
       <Modal
