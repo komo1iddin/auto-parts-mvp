@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { ChevronDown, X, Undo2 } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
-import { PART_TYPES, formatCny } from "@/lib/utils";
+import { cn, PART_TYPES, formatCny } from "@/lib/utils";
 
 interface Supplier {
   id: string;
@@ -52,8 +53,68 @@ interface OrderBuilderProps {
   redirectTo: string;
 }
 
-const cellInput =
-  "h-7 w-full rounded border border-gray-200 bg-white px-2 text-xs text-gray-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100";
+/** Inline select for table cells — shadcn style, no label wrapper */
+function TableSelect({
+  value,
+  onChange,
+  options,
+  width,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  width: number;
+}) {
+  return (
+    <div className="relative" style={{ width }}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          "flex h-7 w-full appearance-none rounded-md border border-input bg-background px-2 py-0 pr-6 text-xs shadow-xs transition-colors outline-none",
+          "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50"
+        )}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+    </div>
+  );
+}
+
+/** Inline number input for table cells */
+function TableInput({
+  value,
+  onChange,
+  width,
+  center,
+  placeholder,
+}: {
+  value: string | number;
+  onChange: (v: string) => void;
+  width: number;
+  center?: boolean;
+  placeholder?: string;
+}) {
+  return (
+    <input
+      type="number"
+      min={0}
+      step={0.01}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder ?? "0"}
+      className={cn(
+        "flex h-7 rounded-md border border-input bg-background px-2 py-0 text-xs shadow-xs transition-colors outline-none",
+        "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50",
+        center && "text-center"
+      )}
+      style={{ width }}
+    />
+  );
+}
 
 export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilderProps) {
   const router = useRouter();
@@ -66,14 +127,24 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<OrderItem | null>(null);
+  const [undoState, setUndoState] = useState<{ item: OrderItem; index: number } | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const originalItems = useRef<OrderItem[]>(existingOrder?.items ?? []);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch("/api/suppliers")
       .then((r) => r.json())
       .then((d) => setSuppliers(d.suppliers ?? []));
   }, []);
+
+  // Auto-dismiss undo toast after 6s
+  useEffect(() => {
+    if (!undoState) return;
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setUndoState(null), 6000);
+    return () => { if (undoTimer.current) clearTimeout(undoTimer.current); };
+  }, [undoState]);
 
   const search = useCallback(async (query: string) => {
     if (!query.trim()) { setSearchResults([]); return; }
@@ -90,9 +161,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
   }, [q, search]);
 
   const duplicateCodes = new Set(
-    items
-      .map((i) => i.partCode)
-      .filter((code, _, arr) => arr.filter((c) => c === code).length > 1)
+    items.map((i) => i.partCode).filter((code, _, arr) => arr.filter((c) => c === code).length > 1)
   );
 
   function addPart(part: Part) {
@@ -124,8 +193,9 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
   }
 
   function updateQty(partId: string, qty: number) {
-    if (qty < 1) return;
-    setItems((prev) => prev.map((i) => i.partId === partId ? { ...i, quantity: qty } : i));
+    // Never auto-delete on quantity change — user must use X button explicitly
+    const safe = Math.max(0, Math.floor(qty));
+    setItems((prev) => prev.map((i) => i.partId === partId ? { ...i, quantity: safe } : i));
   }
 
   function updateField<K extends keyof OrderItem>(partId: string, field: K, value: OrderItem[K]) {
@@ -137,8 +207,21 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
   }
 
   function removeItem(partId: string) {
+    const idx = items.findIndex((i) => i.partId === partId);
+    const item = items[idx];
     setItems((prev) => prev.filter((i) => i.partId !== partId));
     setDeleteTarget(null);
+    if (item) setUndoState({ item, index: idx });
+  }
+
+  function undoDelete() {
+    if (!undoState) return;
+    setItems((prev) => {
+      const next = [...prev];
+      next.splice(undoState.index, 0, undoState.item);
+      return next;
+    });
+    setUndoState(null);
   }
 
   const totalSelling = items.reduce((s, i) => s + (i.sellingPriceCny ?? 0) * i.quantity, 0);
@@ -183,6 +266,12 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
     router.refresh();
   }
 
+  const typeOptions = Object.entries(PART_TYPES).map(([k, v]) => ({ value: k, label: v }));
+  const supplierOptions = [
+    { value: "", label: "—" },
+    ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+  ];
+
   return (
     <div className="space-y-6">
       {/* Search */}
@@ -212,9 +301,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
                       {p.brand && <span className="text-gray-400 text-xs ml-1">• {p.brand}</span>}
                     </div>
                     {alreadyInOrder && (
-                      <span className="shrink-0 rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-700">
-                        mavjud
-                      </span>
+                      <span className="shrink-0 rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-700">mavjud</span>
                     )}
                     <span className="shrink-0 text-xs text-gray-400">{PART_TYPES[p.type]}</span>
                     {p.sellingPriceCny && (
@@ -242,21 +329,21 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs whitespace-nowrap">Kod</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Nomi</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Turi</th>
-                  {isAdmin && <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs whitespace-nowrap">Xarid (¥)</th>}
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs whitespace-nowrap">Sotuv (¥)</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Miqdor</th>
-                  {isAdmin && <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs whitespace-nowrap">Ta'minotchi</th>}
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium text-xs">Izoh</th>
-                  <th className="w-8" />
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 whitespace-nowrap">Kod</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Nomi</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Turi</th>
+                  {isAdmin && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 whitespace-nowrap">Xarid (¥)</th>}
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 whitespace-nowrap">Sotuv (¥)</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Miqdor</th>
+                  {isAdmin && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 whitespace-nowrap">Ta'minotchi</th>}
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Izoh</th>
+                  <th className="w-10" />
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
                   <tr key={item.partId} className="border-b border-gray-50 hover:bg-gray-50/50">
-                    {/* Kod — whitespace-nowrap so it never wraps */}
+                    {/* Kod */}
                     <td className="px-4 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs font-semibold text-gray-800">{item.partCode}</span>
@@ -270,103 +357,89 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-2 text-gray-700 text-xs max-w-[120px] truncate">{item.partName || "—"}</td>
+
+                    {/* Nomi */}
+                    <td className="px-4 py-2 text-gray-600 text-xs max-w-[120px] truncate">{item.partName || "—"}</td>
 
                     {/* Turi */}
-                    <td className="px-4 py-2">
-                      <select
+                    <td className="px-4 py-2 text-center">
+                      <TableSelect
                         value={item.type}
-                        onChange={(e) => updateField(item.partId, "type", e.target.value)}
-                        className={cellInput}
-                        style={{ width: 90 }}
-                      >
-                        {Object.entries(PART_TYPES).map(([k, v]) => (
-                          <option key={k} value={k}>{v}</option>
-                        ))}
-                      </select>
+                        onChange={(v) => updateField(item.partId, "type", v)}
+                        options={typeOptions}
+                        width={96}
+                      />
                     </td>
 
-                    {/* Xarid narxi */}
+                    {/* Xarid */}
                     {isAdmin && (
-                      <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.01}
+                      <td className="px-4 py-2 text-center">
+                        <TableInput
                           value={item.purchasePriceCny ?? ""}
-                          onChange={(e) => updateField(item.partId, "purchasePriceCny", e.target.value === "" ? null : Number(e.target.value))}
-                          className={cellInput}
-                          style={{ width: 72 }}
+                          onChange={(v) => updateField(item.partId, "purchasePriceCny", v === "" ? null : Number(v))}
+                          width={72}
                           placeholder="0"
                         />
                       </td>
                     )}
 
-                    {/* Sotuv narxi */}
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        min={0}
-                        step={0.01}
+                    {/* Sotuv */}
+                    <td className="px-4 py-2 text-center">
+                      <TableInput
                         value={item.sellingPriceCny ?? ""}
-                        onChange={(e) => updateField(item.partId, "sellingPriceCny", e.target.value === "" ? null : Number(e.target.value))}
-                        className={cellInput}
-                        style={{ width: 72 }}
+                        onChange={(v) => updateField(item.partId, "sellingPriceCny", v === "" ? null : Number(v))}
+                        width={72}
                         placeholder="0"
                       />
                     </td>
 
                     {/* Miqdor */}
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        min={1}
+                    <td className="px-4 py-2 text-center">
+                      <TableInput
                         value={item.quantity}
-                        onChange={(e) => updateQty(item.partId, Number(e.target.value))}
-                        className={`${cellInput} text-center`}
-                        style={{ width: 56 }}
+                        onChange={(v) => updateQty(item.partId, Number(v))}
+                        width={56}
+                        center
                       />
                     </td>
 
-                    {/* Ta'minotchi — select */}
+                    {/* Ta'minotchi */}
                     {isAdmin && (
-                      <td className="px-4 py-2">
-                        <select
+                      <td className="px-4 py-2 text-center">
+                        <TableSelect
                           value={item.supplierId}
-                          onChange={(e) => {
-                            const sup = suppliers.find((s) => s.id === e.target.value);
-                            updateField(item.partId, "supplierId", e.target.value);
+                          onChange={(v) => {
+                            const sup = suppliers.find((s) => s.id === v);
+                            updateField(item.partId, "supplierId", v);
                             updateField(item.partId, "supplierName", sup?.name ?? "");
                           }}
-                          className={cellInput}
-                          style={{ width: 110 }}
-                        >
-                          <option value="">—</option>
-                          {suppliers.map((s) => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
-                        </select>
+                          options={supplierOptions}
+                          width={110}
+                        />
                       </td>
                     )}
 
                     {/* Izoh */}
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 text-center">
                       <input
                         type="text"
                         value={item.note}
                         onChange={(e) => updateField(item.partId, "note", e.target.value)}
                         placeholder="Izoh..."
-                        className={cellInput}
+                        className={cn(
+                          "flex h-7 rounded-md border border-input bg-background px-2 py-0 text-xs shadow-xs transition-colors outline-none",
+                          "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50"
+                        )}
                         style={{ width: 100 }}
                       />
                     </td>
 
                     {/* Delete */}
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 text-center">
                       <button
                         type="button"
                         onClick={() => confirmDelete(item)}
-                        className="flex items-center justify-center size-6 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        className="inline-flex items-center justify-center size-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                       >
                         <X className="size-3.5" />
                       </button>
@@ -381,18 +454,15 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
 
       {/* Options */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <div className="w-48">
-          <label className="text-sm font-medium text-foreground mb-1 block">Holat</label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="flex h-9 w-full appearance-none rounded-md border border-input bg-transparent px-3 py-1 pr-8 text-sm shadow-xs outline-none focus-visible:border-ring"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}
-          >
-            <option value="draft">Qoralama</option>
-            <option value="confirmed">Tasdiqlangan</option>
-          </select>
-        </div>
+        <Select
+          label="Holat"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="w-48"
+        >
+          <option value="draft">Qoralama</option>
+          <option value="confirmed">Tasdiqlangan</option>
+        </Select>
 
         {existingOrder && (
           <div className="space-y-1">
@@ -415,12 +485,38 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
         </p>
       )}
 
-      {/* bottom padding so content isn't hidden behind sticky bar */}
       <div className="h-20" />
+
+      {/* Undo toast */}
+      {undoState && (
+        <div className="fixed bottom-20 left-64 right-0 z-50 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-lg text-sm">
+            <span className="text-gray-600">
+              <span className="font-mono font-semibold text-gray-800">{undoState.item.partCode}</span>{" "}
+              o'chirildi
+            </span>
+            <button
+              type="button"
+              onClick={undoDelete}
+              className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1 text-xs font-medium text-white hover:bg-gray-700 transition-colors"
+            >
+              <Undo2 className="size-3" />
+              Qaytarish
+            </button>
+            <button
+              type="button"
+              onClick={() => setUndoState(null)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Sticky action bar — left-64 matches sidebar w-64 */}
       <div className="fixed bottom-0 left-64 right-0 z-40 border-t border-gray-200 bg-white shadow-lg">
-        <div className="flex items-center justify-between px-6 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-6 text-sm text-gray-600">
             <span>
               <span className="text-gray-400">Qismlar:</span>{" "}
@@ -483,10 +579,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo }: OrderBuilde
               <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
                 Bekor qilish
               </Button>
-              <Button
-                onClick={() => removeItem(deleteTarget.partId)}
-                className="bg-red-500 hover:bg-red-600 text-white border-red-500"
-              >
+              <Button variant="destructive" onClick={() => removeItem(deleteTarget.partId)}>
                 O'chirish
               </Button>
             </div>
