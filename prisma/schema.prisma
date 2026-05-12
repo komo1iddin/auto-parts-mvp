@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @db.Uuid
+  name      String
+  email     String   @unique
+  role      String   @default("client")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  createdOrders Order[]         @relation("CreatedOrders")
+  updatedOrders Order[]         @relation("UpdatedOrders")
+  revisions     OrderRevision[]
+  exports       OrderExport[]
+
+  @@map("users")
+}
+
+model Category {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  parentId  String?    @map("parent_id") @db.Uuid
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  parent   Category?  @relation("SubCategories", fields: [parentId], references: [id])
+  children Category[] @relation("SubCategories")
+  parts    Part[]
+
+  @@map("categories")
+}
+
+model Supplier {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  phone     String?
+  wechat    String?
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  parts   Part[]
+  exports OrderExport[]
+
+  @@map("suppliers")
+}
+
+model Part {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code              String   @unique
+  name              String?
+  categoryId        String?  @map("category_id") @db.Uuid
+  brand             String?
+  type              String   @default("original")
+  purchasePriceCny  Decimal? @map("purchase_price_cny") @db.Decimal(12, 2)
+  wholesalePriceCny Decimal? @map("wholesale_price_cny") @db.Decimal(12, 2)
+  sellingPriceCny   Decimal? @map("selling_price_cny") @db.Decimal(12, 2)
+  supplierId        String?  @map("supplier_id") @db.Uuid
+  imageUrl          String?  @map("image_url")
+  note              String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  category   Category?   @relation(fields: [categoryId], references: [id])
+  supplier   Supplier?   @relation(fields: [supplierId], references: [id])
+  orderItems OrderItem[]
+
+  @@map("parts")
+}
+
+model Order {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  baseOrderNumber    String   @map("base_order_number")
+  currentOrderNumber String   @unique @map("current_order_number")
+  version            Int      @default(1)
+  status             String   @default("draft")
+  createdBy          String?  @map("created_by") @db.Uuid
+  updatedBy          String?  @map("updated_by") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+
+  creator   User?           @relation("CreatedOrders", fields: [createdBy], references: [id])
+  updater   User?           @relation("UpdatedOrders", fields: [updatedBy], references: [id])
+  items     OrderItem[]
+  revisions OrderRevision[]
+  exports   OrderExport[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId           String   @map("order_id") @db.Uuid
+  partId            String?  @map("part_id") @db.Uuid
+  partCode          String   @map("part_code")
+  partName          String?  @map("part_name")
+  categoryName      String?  @map("category_name")
+  brand             String?
+  type              String?
+  purchasePriceCny  Decimal? @map("purchase_price_cny") @db.Decimal(12, 2)
+  wholesalePriceCny Decimal? @map("wholesale_price_cny") @db.Decimal(12, 2)
+  sellingPriceCny   Decimal? @map("selling_price_cny") @db.Decimal(12, 2)
+  supplierId        String?  @map("supplier_id") @db.Uuid
+  supplierName      String?  @map("supplier_name")
+  quantity          Int      @default(1)
+  note              String?
+
+  order Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  part  Part?  @relation(fields: [partId], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderRevision {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId        String   @map("order_id") @db.Uuid
+  version        Int
+  oldOrderNumber String?  @map("old_order_number")
+  newOrderNumber String   @map("new_order_number")
+  changedBy      String?  @map("changed_by") @db.Uuid
+  changeNote     String?  @map("change_note")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changer User? @relation(fields: [changedBy], references: [id])
+
+  @@map("order_revisions")
+}
+
+model OrderExport {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  exportType String   @map("export_type")
+  language   String   @default("internal")
+  supplierId String?  @map("supplier_id") @db.Uuid
+  fileName   String   @map("file_name")
+  exportedBy String?  @map("exported_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+  exporter User?     @relation(fields: [exportedBy], references: [id])
+
+  @@map("order_exports")
+}

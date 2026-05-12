@@ -1,0 +1,10 @@
+import { OrderBuilder } from "@/components/orders/OrderBuilder";
+
+export default function NewOrderPage() {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Yangi buyurtma</h1>
+      <OrderBuilder isAdmin={true} redirectTo="/admin/orders" />
+    </div>
+  );
+}
