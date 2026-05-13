@@ -1,4 +1,4 @@
-import type { DetailItem, ExportRecord } from "@/components/orders/orderDetailTypes";
+import type { DetailItem, ExportRecord } from "@/components/orders/types/orderDetailTypes";
 
 export function toNumber(value: DetailItem["purchasePriceCny"]) {
   if (value == null) return 0;

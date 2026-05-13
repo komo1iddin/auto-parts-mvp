@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import type {
   OrderItem,
   PendingNavigation,
-} from "@/components/orders/orderBuilderTypes";
+} from "@/components/orders/types/orderBuilderTypes";
 
 interface OrderBuilderModalsProps {
   deleteTarget: OrderItem | null;

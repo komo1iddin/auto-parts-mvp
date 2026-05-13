@@ -1,10 +1,10 @@
 import type { OrderFinanceSummary } from "@/lib/order-finance";
 import { cn } from "@/lib/utils";
-import { FinanceBlock } from "@/components/orders/FinanceBlock";
+import { FinanceBlock } from "@/components/orders/finance/FinanceBlock";
 import {
   CLIENT_STATUS_LABELS,
   valueTone,
-} from "@/components/orders/orderFinanceUtils";
+} from "@/components/orders/finance/orderFinanceUtils";
 
 interface FinanceSummaryCardsProps {
   isAdmin: boolean;

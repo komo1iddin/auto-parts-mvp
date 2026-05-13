@@ -1,5 +1,5 @@
 import { cn, formatCny } from "@/lib/utils";
-import { valueTone } from "@/components/orders/orderFinanceUtils";
+import { valueTone } from "@/components/orders/finance/orderFinanceUtils";
 
 interface FinanceBlockProps {
   label: string;

@@ -1,4 +1,4 @@
-import type { Category, PartFormData, PartFormDefaultValues } from "@/components/parts/types";
+import type { Category, PartFormData, PartFormDefaultValues } from "@/components/parts/types/parts";
 
 export function flattenCategories(cats: Category[], prefix = ""): Category[] {
   return cats.flatMap((category) => [

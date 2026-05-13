@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { PART_TYPES } from "@/lib/utils";
-import type { Category, PartFormData, Supplier } from "@/components/parts/types";
+import type { Category, PartFormData, Supplier } from "@/components/parts/types/parts";
 
 interface PartFormFieldsProps {
   form: PartFormData;

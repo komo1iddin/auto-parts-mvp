@@ -5,23 +5,23 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AlertDialog } from "@/components/ui/AlertDialog";
-import { FinanceSummaryCards } from "@/components/orders/FinanceSummaryCards";
-import { PaymentFormModal } from "@/components/orders/PaymentFormModal";
-import { PaymentTable } from "@/components/orders/PaymentTable";
-import { SupplierBreakdownTable } from "@/components/orders/SupplierBreakdownTable";
+import { FinanceSummaryCards } from "@/components/orders/finance/FinanceSummaryCards";
+import { PaymentFormModal } from "@/components/orders/finance/PaymentFormModal";
+import { PaymentTable } from "@/components/orders/finance/PaymentTable";
+import { SupplierBreakdownTable } from "@/components/orders/finance/SupplierBreakdownTable";
 import type {
   FinanceTabKey,
   OrderFinancePageProps,
   PaymentForm,
   PaymentKind,
   PaymentRecord,
-} from "@/components/orders/orderFinanceTypes";
+} from "@/components/orders/types/orderFinanceTypes";
 import {
   CLIENT_STATUS_LABELS,
   FINANCE_STATUS_LABELS,
   statusTextClass,
   toDateInput,
-} from "@/components/orders/orderFinanceUtils";
+} from "@/components/orders/finance/orderFinanceUtils";
 import {
   PAYMENT_METHODS,
   type PaymentMethod,

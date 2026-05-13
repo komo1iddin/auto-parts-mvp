@@ -1,4 +1,4 @@
-import type { OrderItem } from "@/components/orders/orderBuilderTypes";
+import type { OrderItem } from "@/components/orders/types/orderBuilderTypes";
 
 export function serializeItems(items: OrderItem[]) {
   return JSON.stringify(items);

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { OrderDetailView } from "@/components/orders/OrderDetailView";
-import { OrderFinancePanel } from "@/components/orders/OrderFinancePanel";
+import { OrderFinancePanel } from "@/components/orders/finance/OrderFinancePanel";
 import { calculateOrderFinance } from "@/lib/order-finance";
 
 export default async function AdminOrderDetailPage({

@@ -1,7 +1,7 @@
-import { PartDetails } from "@/components/parts/PartDetails";
+import { PartDetails } from "@/components/parts/detail/PartDetails";
 import { PartForm } from "@/components/parts/PartForm";
 import { Modal } from "@/components/ui/Modal";
-import type { Part } from "@/components/parts/types";
+import type { Part } from "@/components/parts/types/parts";
 
 interface PartModalsProps {
   isAdmin: boolean;

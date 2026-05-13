@@ -1,7 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/Input";
-import type { OrderItem, PartSearchResult } from "@/components/orders/orderBuilderTypes";
+import type { OrderItem, PartSearchResult } from "@/components/orders/types/orderBuilderTypes";
 import { PART_TYPES, formatCny } from "@/lib/utils";
 
 interface OrderPartSearchProps {

@@ -2,21 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { OrderBuilderBar } from "@/components/orders/OrderBuilderBar";
-import { OrderBuilderModals } from "@/components/orders/OrderBuilderModals";
-import { OrderBuilderOptions } from "@/components/orders/OrderBuilderOptions";
-import { OrderItemsTable } from "@/components/orders/OrderItemsTable";
-import { OrderPartSearch } from "@/components/orders/OrderPartSearch";
+import { OrderBuilderBar } from "@/components/orders/builder/OrderBuilderBar";
+import { OrderBuilderModals } from "@/components/orders/builder/OrderBuilderModals";
+import { OrderBuilderOptions } from "@/components/orders/builder/OrderBuilderOptions";
+import { OrderItemsTable } from "@/components/orders/builder/OrderItemsTable";
+import { OrderPartSearch } from "@/components/orders/builder/OrderPartSearch";
 import type {
   OrderItem,
   PartSearchResult,
   PendingNavigation,
   Supplier,
-} from "@/components/orders/orderBuilderTypes";
+} from "@/components/orders/types/orderBuilderTypes";
 import {
   buildOrderChangelog,
   serializeItems,
-} from "@/components/orders/orderBuilderUtils";
+} from "@/components/orders/builder/orderBuilderUtils";
 
 interface OrderBuilderProps {
   isAdmin: boolean;

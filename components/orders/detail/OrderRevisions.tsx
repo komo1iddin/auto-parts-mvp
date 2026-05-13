@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
-import type { Revision } from "@/components/orders/orderDetailTypes";
-import { formatDateTime, splitChanges } from "@/components/orders/orderDetailUtils";
+import type { Revision } from "@/components/orders/types/orderDetailTypes";
+import { formatDateTime, splitChanges } from "@/components/orders/detail/orderDetailUtils";
 
 export function OrderRevisions({ revisions }: { revisions: Revision[] }) {
   return (

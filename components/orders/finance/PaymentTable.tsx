@@ -1,7 +1,7 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import type { PaymentKind, PaymentRecord } from "@/components/orders/orderFinanceTypes";
-import { formatDate } from "@/components/orders/orderFinanceUtils";
+import type { PaymentKind, PaymentRecord } from "@/components/orders/types/orderFinanceTypes";
+import { formatDate } from "@/components/orders/finance/orderFinanceUtils";
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/lib/order-finance";
 import { formatCny } from "@/lib/utils";
 

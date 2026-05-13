@@ -1,8 +1,8 @@
-import { OrderDetailHeader } from "@/components/orders/OrderDetailHeader";
-import { OrderDetailItemsTable } from "@/components/orders/OrderDetailItemsTable";
-import { OrderRevisions } from "@/components/orders/OrderRevisions";
-import type { OrderDetailViewProps } from "@/components/orders/orderDetailTypes";
-import { exportLabel } from "@/components/orders/orderDetailUtils";
+import { OrderDetailHeader } from "@/components/orders/detail/OrderDetailHeader";
+import { OrderDetailItemsTable } from "@/components/orders/detail/OrderDetailItemsTable";
+import { OrderRevisions } from "@/components/orders/detail/OrderRevisions";
+import type { OrderDetailViewProps } from "@/components/orders/types/orderDetailTypes";
+import { exportLabel } from "@/components/orders/detail/orderDetailUtils";
 
 export function OrderDetailView({ order, isAdmin, basePath, exports, financePanel }: OrderDetailViewProps) {
   const supplierNames = [...new Set(order.items.map((item) => item.supplierName).filter(isPresent))];

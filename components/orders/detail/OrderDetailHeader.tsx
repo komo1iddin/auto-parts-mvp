@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { CancelOrderButton } from "@/components/orders/CancelOrderButton";
-import { ExportButtons } from "@/components/orders/ExportButtons";
-import { OrderTitleEditor } from "@/components/orders/OrderTitleEditor";
-import type { OrderDetail } from "@/components/orders/orderDetailTypes";
-import { formatDateTime } from "@/components/orders/orderDetailUtils";
+import { CancelOrderButton } from "@/components/orders/actions/CancelOrderButton";
+import { ExportButtons } from "@/components/orders/actions/ExportButtons";
+import { OrderTitleEditor } from "@/components/orders/actions/OrderTitleEditor";
+import type { OrderDetail } from "@/components/orders/types/orderDetailTypes";
+import { formatDateTime } from "@/components/orders/detail/orderDetailUtils";
 import { ORDER_STATUSES } from "@/lib/utils";
 
 interface OrderDetailHeaderProps {

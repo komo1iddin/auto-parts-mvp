@@ -2,19 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PartFormFields } from "@/components/parts/PartFormFields";
-import { PartImageUpload } from "@/components/parts/PartImageUpload";
+import { PartFormFields } from "@/components/parts/form/PartFormFields";
+import { PartImageUpload } from "@/components/parts/form/PartImageUpload";
 import {
   buildInitialPartForm,
   flattenCategories,
   toPartPayload,
-} from "@/components/parts/partFormUtils";
+} from "@/components/parts/form/partFormUtils";
 import type {
   Category,
   PartFormData,
   PartFormDefaultValues,
   Supplier,
-} from "@/components/parts/types";
+} from "@/components/parts/types/parts";
 import { Button } from "@/components/ui/Button";
 
 interface PartFormProps {

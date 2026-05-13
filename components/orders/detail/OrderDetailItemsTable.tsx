@@ -1,6 +1,6 @@
-import { OrderPartCodeButton } from "@/components/orders/OrderPartCodeButton";
-import type { OrderDetail } from "@/components/orders/orderDetailTypes";
-import { profitClass, toNumber } from "@/components/orders/orderDetailUtils";
+import { OrderPartCodeButton } from "@/components/orders/detail/OrderPartCodeButton";
+import type { OrderDetail } from "@/components/orders/types/orderDetailTypes";
+import { profitClass, toNumber } from "@/components/orders/detail/orderDetailUtils";
 import { PART_TYPES, cn, formatCny } from "@/lib/utils";
 
 interface OrderDetailItemsTableProps {

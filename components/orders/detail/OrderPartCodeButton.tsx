@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PartDetails, type PartDetailsData } from "@/components/parts/PartDetails";
+import { PartDetails, type PartDetailsData } from "@/components/parts/detail/PartDetails";
 import { Modal } from "@/components/ui/Modal";
 
 interface OrderPartCodeButtonProps {

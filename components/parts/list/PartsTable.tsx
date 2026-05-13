@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { PART_TYPES, formatCny } from "@/lib/utils";
-import type { Part } from "@/components/parts/types";
+import type { Part } from "@/components/parts/types/parts";
 
 interface PartsTableProps {
   parts: Part[];

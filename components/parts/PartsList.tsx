@@ -2,12 +2,12 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { PartModals } from "@/components/parts/PartModals";
-import { PartsListHeader } from "@/components/parts/PartsListHeader";
-import { PartsListToolbar } from "@/components/parts/PartsListToolbar";
-import { PartsPagination } from "@/components/parts/PartsPagination";
-import { PartsTable } from "@/components/parts/PartsTable";
-import type { Part } from "@/components/parts/types";
+import { PartModals } from "@/components/parts/list/PartModals";
+import { PartsListHeader } from "@/components/parts/list/PartsListHeader";
+import { PartsListToolbar } from "@/components/parts/list/PartsListToolbar";
+import { PartsPagination } from "@/components/parts/list/PartsPagination";
+import { PartsTable } from "@/components/parts/list/PartsTable";
+import type { Part } from "@/components/parts/types/parts";
 
 interface PartsListProps {
   parts: Part[];

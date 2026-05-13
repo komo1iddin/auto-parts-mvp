@@ -6,7 +6,7 @@ import type {
   PaymentForm,
   PaymentKind,
   SupplierOption,
-} from "@/components/orders/orderFinanceTypes";
+} from "@/components/orders/types/orderFinanceTypes";
 import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_METHODS,
