@@ -26,6 +26,7 @@ const tableByModel = {
   orderExport: "order_exports",
   clientPayment: "client_payments",
   supplierPayment: "supplier_payments",
+  settingOption: "setting_options",
 } as const;
 
 const columnByField: Record<string, string> = {
@@ -59,6 +60,7 @@ const columnByField: Record<string, string> = {
   amountCny: "amount_cny",
   paymentDate: "payment_date",
   paymentMethod: "payment_method",
+  sortOrder: "sort_order",
 };
 
 const fieldByColumn = Object.fromEntries(
@@ -596,4 +598,5 @@ export const prisma: any = {
   orderExport: modelApi("orderExport"),
   clientPayment: modelApi("clientPayment"),
   supplierPayment: modelApi("supplierPayment"),
+  settingOption: modelApi("settingOption"),
 };

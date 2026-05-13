@@ -10,6 +10,12 @@ export interface Supplier {
   name: string;
 }
 
+export interface SettingOption {
+  id: string;
+  value: string;
+  label: string;
+}
+
 export interface PartFormData {
   code: string;
   name: string;

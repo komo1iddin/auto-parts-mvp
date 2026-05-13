@@ -13,6 +13,7 @@ import type {
   Category,
   PartFormData,
   PartFormDefaultValues,
+  SettingOption,
   Supplier,
 } from "@/components/parts/types/parts";
 import { Button } from "@/components/ui/Button";
@@ -44,6 +45,8 @@ export function PartForm({ defaultValues, mode, onSuccess, onCancel, className }
   const [form, setForm] = useState<PartFormData>(() => buildInitialPartForm(defaultValues));
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [brands, setBrands] = useState<SettingOption[]>([]);
+  const [partQualityTypes, setPartQualityTypes] = useState<SettingOption[]>([]);
   const [uploading, setUploading] = useState(false);
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,6 +60,14 @@ export function PartForm({ defaultValues, mode, onSuccess, onCancel, className }
     fetch("/api/suppliers")
       .then((response) => response.json())
       .then((data) => setSuppliers(data.suppliers ?? []));
+
+    fetch("/api/settings/options?kind=brand")
+      .then((response) => response.json())
+      .then((data) => setBrands(data.options ?? []));
+
+    fetch("/api/settings/options?kind=part_quality_type")
+      .then((response) => response.json())
+      .then((data) => setPartQualityTypes(data.options ?? []));
   }, []);
 
   useEffect(() => {
@@ -154,6 +165,8 @@ export function PartForm({ defaultValues, mode, onSuccess, onCancel, className }
         form={form}
         categories={categories}
         suppliers={suppliers}
+        brands={brands}
+        partQualityTypes={partQualityTypes}
         defaultCategoryName={defaultCategoryName}
         defaultSupplierName={defaultSupplierName}
         onChange={updateField}

@@ -18,6 +18,7 @@ export const DATA_TAGS = {
   suppliers: "suppliers",
   customers: "customers",
   users: "users",
+  settings: "settings",
 } as const;
 
 export function revalidateAppData(...tags: Array<keyof typeof DATA_TAGS>) {
@@ -391,6 +392,52 @@ export const getPartsList = unstable_cache(
     revalidate: 10,
   }
 );
+
+export const SETTING_OPTION_KINDS = {
+  brand: "brand",
+  partQualityType: "part_quality_type",
+} as const;
+
+export type SettingOptionKind = (typeof SETTING_OPTION_KINDS)[keyof typeof SETTING_OPTION_KINDS];
+
+export interface SettingOption {
+  id: string;
+  kind: SettingOptionKind;
+  value: string;
+  label: string;
+  sortOrder: number;
+}
+
+export function makeSettingValue(label: string) {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export const getSettingOptions = unstable_cache(
+  async (kind: SettingOptionKind) => {
+    return prisma.settingOption.findMany({
+      where: { kind },
+      orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+    }) as Promise<SettingOption[]>;
+  },
+  ["setting-options"],
+  {
+    tags: [DATA_TAGS.settings],
+    revalidate: 15,
+  }
+);
+
+export async function getPartFormOptions() {
+  const [brands, partQualityTypes] = await Promise.all([
+    getSettingOptions(SETTING_OPTION_KINDS.brand),
+    getSettingOptions(SETTING_OPTION_KINDS.partQualityType),
+  ]);
+
+  return { brands, partQualityTypes };
+}
 
 export const getUsersList = unstable_cache(
   async () => {

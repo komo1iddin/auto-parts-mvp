@@ -2,12 +2,14 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { PART_TYPES } from "@/lib/utils";
-import type { Category, PartFormData, Supplier } from "@/components/parts/types/parts";
+import type { Category, PartFormData, SettingOption, Supplier } from "@/components/parts/types/parts";
 
 interface PartFormFieldsProps {
   form: PartFormData;
   categories: Category[];
   suppliers: Supplier[];
+  brands: SettingOption[];
+  partQualityTypes: SettingOption[];
   defaultCategoryName?: string;
   defaultSupplierName?: string;
   onChange: (key: keyof PartFormData, value: string) => void;
@@ -17,10 +19,16 @@ export function PartFormFields({
   form,
   categories,
   suppliers,
+  brands,
+  partQualityTypes,
   defaultCategoryName,
   defaultSupplierName,
   onChange,
 }: PartFormFieldsProps) {
+  const typeOptions = partQualityTypes.length
+    ? partQualityTypes
+    : Object.entries(PART_TYPES).map(([value, label]) => ({ id: value, value, label }));
+
   return (
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -63,21 +71,30 @@ export function PartFormFields({
           value={form.type}
           onChange={(event) => onChange("type", event.target.value)}
         >
-          {Object.entries(PART_TYPES).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
+          {typeOptions.map((option) => (
+            <option key={option.id} value={option.value}>
+              {option.label}
             </option>
           ))}
         </Select>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input
+        <Select
           label="Brend"
           value={form.brand}
           onChange={(event) => onChange("brand", event.target.value)}
-          placeholder="Toyota, BMW..."
-        />
+        >
+          <option value="">— Brend tanlanmagan —</option>
+          {form.brand && !brands.some((brand) => brand.value === form.brand) && (
+            <option value={form.brand}>{form.brand}</option>
+          )}
+          {brands.map((brand) => (
+            <option key={brand.id} value={brand.value}>
+              {brand.label}
+            </option>
+          ))}
+        </Select>
         <Select
           label="Ta'minotchi"
           value={form.supplierId}

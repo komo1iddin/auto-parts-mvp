@@ -13,6 +13,7 @@ import {
   Gauge,
   LogOut,
   PackageSearch,
+  Settings,
   UserRound,
   Users,
   Warehouse,
@@ -32,6 +33,7 @@ const adminNav: NavItem[] = [
   { href: "/admin/customers", label: "Mijozlar", icon: UserRound },
   { href: "/admin/orders", label: "Buyurtmalar", icon: ClipboardList },
   { href: "/admin/users", label: "Foydalanuvchilar", icon: Users },
+  { href: "/admin/settings", label: "Sozlamalar", icon: Settings },
 ];
 
 const managerNav: NavItem[] = [
