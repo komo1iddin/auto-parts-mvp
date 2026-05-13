@@ -7,11 +7,11 @@ export const CLIENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   unpaid: "To'lanmagan",
   partially_paid: "Qisman",
   paid: "To'langan",
-  overpaid: "Ortiqcha",
+  overpaid: "Ortiqcha to'lov",
 };
 
 export const FINANCE_STATUS_LABELS: Record<OrderFinanceStatus, string> = {
-  waiting_client_payment: "Mijoz kutilmoqda",
+  waiting_client_payment: "Mijoz to'lovi kutilmoqda",
   client_partially_paid: "Mijoz qisman",
   ready_to_pay_supplier: "Ta'minotchiga to'lash mumkin",
   supplier_partially_paid: "Ta'minotchi qisman",

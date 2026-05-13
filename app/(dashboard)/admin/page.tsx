@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Banknote, ClipboardList, PackageSearch, TrendingUp, Users, Wallet, Warehouse } from "lucide-react";
+import { AlertTriangle, ArrowRight, Banknote, ClipboardList, PackageSearch, TrendingUp, Users, Wallet, Warehouse } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { getAdminDashboardData } from "@/lib/data";
@@ -28,9 +28,9 @@ export default async function AdminDashboard() {
       tone: "text-green-700",
     },
     {
-      label: "Jami kirim",
+      label: "Jami tannarx",
       value: formatCny(financeTotals.supplierTotal),
-      subtitle: `${formatCny(financeTotals.supplierPaid)} to'langan`,
+      subtitle: "Buyurtmalarning xarid qiymati",
       href: "/admin/suppliers",
       icon: Banknote,
       tone: "text-red-700",
@@ -38,18 +38,26 @@ export default async function AdminDashboard() {
     {
       label: "Foyda",
       value: formatCny(financeTotals.expectedGrossProfit),
-      subtitle: `${formatCny(financeTotals.clientBalance)} mijoz qarzi`,
+      subtitle: "Faol buyurtmalar bo'yicha",
       href: "/admin/orders",
       icon: TrendingUp,
       tone: financeTotals.expectedGrossProfit >= 0 ? "text-emerald-700" : "text-red-700",
     },
     {
-      label: "Qolgan to'lov",
+      label: "Mijoz qarzi",
       value: formatCny(financeTotals.clientBalance),
-      subtitle: `${financeTotals.clientBalanceOrdersCount} ta buyurtmada`,
+      subtitle: "Mijozlardan olinishi kerak",
       href: "/admin/orders",
       icon: Banknote,
       tone: financeTotals.clientBalance > 0 ? "text-amber-700" : "text-green-700",
+    },
+    {
+      label: "Supplier qarzi",
+      value: formatCny(financeTotals.supplierBalance),
+      subtitle: "Ta'minotchilarga to'lanishi kerak",
+      href: "/admin/suppliers",
+      icon: Banknote,
+      tone: financeTotals.supplierBalance > 0 ? "text-orange-700" : "text-green-700",
     },
   ];
 
@@ -57,27 +65,25 @@ export default async function AdminDashboard() {
     { label: "Qismlar", value: partsCount, href: "/admin/parts", icon: PackageSearch },
     { label: "Ta'minotchilar", value: suppliersCount, href: "/admin/suppliers", icon: Warehouse },
     { label: "Foydalanuvchilar", value: usersCount, href: "/admin/users", icon: Users },
-    {
-      label: "Supplier qarzi",
-      value: formatCny(financeTotals.supplierBalance),
-      href: "/admin/suppliers",
-      icon: Banknote,
-    },
   ];
 
   const statusCards = [
     { label: "Hisoblanmoqda", value: financeTotals.orderStatusCounts.calculating ?? 0 },
     { label: "Tasdiqlangan", value: financeTotals.orderStatusCounts.confirmed ?? 0 },
-    { label: "Ta'minotchiga berildi", value: financeTotals.orderStatusCounts.supplier_ordered ?? 0 },
-    { label: "Yetkazib berishda", value: financeTotals.orderStatusCounts.shipped ?? 0 },
-    { label: "Muammoli", value: financeTotals.orderStatusCounts.problem ?? 0 },
-  ];
-
-  const paymentStatusCards = [
     { label: "Mijoz to'lovi kutilmoqda", value: financeTotals.financeStatusCounts.waiting_client_payment },
     { label: "Qisman to'langan", value: financeTotals.financeStatusCounts.client_partially_paid },
+    { label: "Ta'minotchiga berildi", value: financeTotals.orderStatusCounts.supplier_ordered ?? 0 },
     { label: "Supplierga to'lash kerak", value: financeTotals.financeStatusCounts.ready_to_pay_supplier },
+    { label: "Yetkazib berishda", value: financeTotals.orderStatusCounts.shipped ?? 0 },
+    { label: "Muammoli", value: financeTotals.orderStatusCounts.problem ?? 0 },
     { label: "Yopilgan", value: financeTotals.financeStatusCounts.closed },
+  ];
+
+  const attentionItems = [
+    `${financeTotals.financeStatusCounts.waiting_client_payment} ta buyurtmada mijoz to'lovi kutilmoqda`,
+    `${financeTotals.orderStatusCounts.problem ?? 0} ta muammoli buyurtma`,
+    `${formatCny(financeTotals.supplierBalance)} supplierga to'lanishi kerak`,
+    `${formatCny(financeTotals.clientBalance)} mijozdan olinishi kerak`,
   ];
 
   return (
@@ -89,7 +95,7 @@ export default async function AdminDashboard() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         {primaryStats.map((s) => (
           <Link
             key={s.label}
@@ -106,7 +112,7 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         {secondaryStats.map((s) => (
           <Link
             key={s.label}
@@ -123,27 +129,32 @@ export default async function AdminDashboard() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Zakaz workflow nazorati</CardTitle>
+        <CardHeader className="flex flex-row items-center gap-2">
+          <AlertTriangle className="size-4 text-amber-600" />
+          <CardTitle>E'tibor kerak</CardTitle>
         </CardHeader>
-        <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-4">
+          {attentionItems.map((item) => (
+            <div key={item} className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-foreground">
+              {item}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Buyurtma holatlari</CardTitle>
+        </CardHeader>
+        <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {statusCards.map((status) => (
-            <div key={status.label} className="border-b px-5 py-4 last:border-b-0 sm:border-r lg:border-b-0">
+            <div key={status.label} className="rounded-lg border bg-card px-4 py-3 shadow-xs">
               <div className="text-2xl font-semibold">{status.value}</div>
               <div className="mt-1 text-xs text-muted-foreground">{status.label}</div>
             </div>
           ))}
         </div>
       </Card>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {paymentStatusCards.map((status) => (
-          <div key={status.label} className="rounded-lg border bg-card px-4 py-3 shadow-xs">
-            <div className="text-2xl font-semibold">{status.value}</div>
-            <div className="mt-1 text-xs text-muted-foreground">{status.label}</div>
-          </div>
-        ))}
-      </div>
 
       <Card className="overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between">
@@ -165,7 +176,7 @@ export default async function AdminDashboard() {
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">Holat</th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">Qismlar</th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">Sotuv</th>
-                <th className="px-5 py-3 text-left font-medium text-muted-foreground">Kirim</th>
+                <th className="px-5 py-3 text-left font-medium text-muted-foreground">Tannarx</th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">Foyda</th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">To'lov</th>
               </tr>
@@ -225,18 +236,18 @@ function PaymentBadge({ status }: { status: keyof typeof CLIENT_STATUS_LABELS })
     unpaid: "bg-red-100 text-red-700",
     partially_paid: "bg-amber-100 text-amber-700",
     paid: "bg-green-100 text-green-700",
-    overpaid: "bg-blue-100 text-blue-700",
+    overpaid: "bg-violet-100 text-violet-700",
   };
   return <Badge className={map[status]}>{CLIENT_STATUS_LABELS[status]}</Badge>;
 }
 
 function FinanceStatusBadge({ status }: { status: keyof typeof FINANCE_STATUS_LABELS }) {
   const map = {
-    waiting_client_payment: "bg-red-50 text-red-700",
-    client_partially_paid: "bg-amber-50 text-amber-700",
-    ready_to_pay_supplier: "bg-blue-50 text-blue-700",
-    supplier_partially_paid: "bg-amber-50 text-amber-700",
-    supplier_paid: "bg-emerald-50 text-emerald-700",
+    waiting_client_payment: "bg-amber-100 text-amber-700",
+    client_partially_paid: "bg-yellow-100 text-yellow-700",
+    ready_to_pay_supplier: "bg-blue-100 text-blue-700",
+    supplier_partially_paid: "bg-orange-100 text-orange-700",
+    supplier_paid: "bg-sky-100 text-sky-700",
     closed: "bg-gray-100 text-gray-700",
   };
   return <Badge className={map[status]}>{FINANCE_STATUS_LABELS[status]}</Badge>;

@@ -38,9 +38,9 @@ export default async function ManagerDashboard() {
       tone: "text-green-700",
     },
     {
-      label: "Qolgan to'lov",
+      label: "Mijoz qarzi",
       value: formatCny(financeTotals.clientBalance),
-      subtitle: `${financeTotals.clientBalanceOrdersCount} ta buyurtmada`,
+      subtitle: "Mijozlardan olinishi kerak",
       href: "/manager/orders",
       icon: Wallet,
       tone: financeTotals.clientBalance > 0 ? "text-red-700" : "text-green-700",
@@ -191,7 +191,7 @@ function PaymentBadge({ status }: { status: keyof typeof CLIENT_STATUS_LABELS })
     unpaid: "bg-red-100 text-red-700",
     partially_paid: "bg-amber-100 text-amber-700",
     paid: "bg-green-100 text-green-700",
-    overpaid: "bg-blue-100 text-blue-700",
+    overpaid: "bg-violet-100 text-violet-700",
   };
   return <Badge className={map[status]}>{CLIENT_STATUS_LABELS[status]}</Badge>;
 }
