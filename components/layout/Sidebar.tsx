@@ -128,13 +128,14 @@ export function Sidebar({ role, userName }: SidebarProps) {
             item.href === (role === "admin" ? "/admin" : "/manager")
               ? pathname === item.href
               : pathname.startsWith(item.href);
+          const exactActive = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
               prefetch
               onClick={(event) => {
-                if (active) event.preventDefault();
+                if (exactActive) event.preventDefault();
               }}
               title={collapsed ? item.label : undefined}
               className={cn(

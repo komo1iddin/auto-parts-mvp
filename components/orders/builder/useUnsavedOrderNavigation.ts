@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { PendingNavigation } from "@/components/orders/types/orderBuilderTypes";
 
@@ -11,10 +11,12 @@ interface UseUnsavedOrderNavigationArgs {
 
 export function useUnsavedOrderNavigation({ enabled, isDirty }: UseUnsavedOrderNavigationArgs) {
   const router = useRouter();
+  const [isNavigating, startNavigation] = useTransition();
   const [leavePromptOpen, setLeavePromptOpen] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
   const savedNavigation = useRef(false);
   const isDirtyRef = useRef(false);
+  const hasHistoryGuard = useRef(false);
 
   useEffect(() => {
     isDirtyRef.current = isDirty;
@@ -22,14 +24,23 @@ export function useUnsavedOrderNavigation({ enabled, isDirty }: UseUnsavedOrderN
 
   const requestNavigation = useCallback((next: PendingNavigation) => {
     if (!enabled || !isDirtyRef.current || savedNavigation.current) {
-      if (next.type === "href") router.push(next.href);
-      else window.history.back();
+      startNavigation(() => {
+        if (next.type === "href") router.push(next.href);
+        else window.history.go(next.delta ?? -1);
+      });
       return;
     }
 
     setPendingNavigation(next);
     setLeavePromptOpen(true);
   }, [enabled, router]);
+
+  useEffect(() => {
+    if (!enabled || !isDirty || savedNavigation.current || hasHistoryGuard.current) return;
+
+    window.history.pushState({ __orderEditGuard: true }, "", window.location.href);
+    hasHistoryGuard.current = true;
+  }, [enabled, isDirty]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -59,12 +70,11 @@ export function useUnsavedOrderNavigation({ enabled, isDirty }: UseUnsavedOrderN
 
     const popState = () => {
       if (!isDirtyRef.current || savedNavigation.current) return;
-      window.history.pushState(null, "", window.location.href);
-      requestNavigation({ type: "back" });
+      window.history.pushState({ __orderEditGuard: true }, "", window.location.href);
+      hasHistoryGuard.current = true;
+      requestNavigation({ type: "back", delta: -2 });
     };
 
-    window.history.replaceState(window.history.state, "", window.location.href);
-    window.history.pushState(null, "", window.location.href);
     window.addEventListener("beforeunload", beforeUnload);
     window.addEventListener("popstate", popState);
     document.addEventListener("click", documentClick, true);
@@ -89,11 +99,14 @@ export function useUnsavedOrderNavigation({ enabled, isDirty }: UseUnsavedOrderN
     if (!pendingNavigation) return;
     markSaved();
     setLeavePromptOpen(false);
-    if (pendingNavigation.type === "href") router.push(pendingNavigation.href);
-    else window.history.back();
+    startNavigation(() => {
+      if (pendingNavigation.type === "href") router.push(pendingNavigation.href);
+      else window.history.go(pendingNavigation.delta ?? -1);
+    });
   }
 
   return {
+    isNavigating,
     leavePromptOpen,
     pendingNavigation,
     requestNavigation,

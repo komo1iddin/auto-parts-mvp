@@ -43,4 +43,4 @@ export interface OrderItem {
   note: string;
 }
 
-export type PendingNavigation = { type: "href"; href: string } | { type: "back" };
+export type PendingNavigation = { type: "href"; href: string } | { type: "back"; delta?: number };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type {
   OrderItem,
@@ -24,10 +24,12 @@ interface UseOrderBuilderArgs {
     customerId?: string | null;
   };
   redirectTo: string;
+  ordersPath?: string;
 }
 
-export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderArgs) {
+export function useOrderBuilder({ existingOrder, redirectTo, ordersPath }: UseOrderBuilderArgs) {
   const router = useRouter();
+  const [isNavigatingAfterSave, startSaveNavigation] = useTransition();
   const search = usePartSearch();
   const orderItems = useOrderItems(existingOrder?.items ?? []);
   const [customerId, setCustomerId] = useState(existingOrder?.customerId ?? "");
@@ -53,6 +55,11 @@ export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderAr
     isDirty,
   });
 
+  useEffect(() => {
+    router.prefetch(redirectTo);
+    if (ordersPath && ordersPath !== redirectTo) router.prefetch(ordersPath);
+  }, [ordersPath, redirectTo, router]);
+
   function addPartAndClearSearch(part: Parameters<typeof orderItems.addPart>[0]) {
     orderItems.addPart(part);
     search.setQ("");
@@ -77,7 +84,7 @@ export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderAr
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ customerId, items: orderItems.items, status, changeNote: finalNote }),
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       setError(data.error ?? "Xatolik yuz berdi");
       setSaving(false);
@@ -85,10 +92,11 @@ export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderAr
     }
 
     navigation.markSaved();
-    if (destination?.type === "href") router.push(destination.href);
-    else if (destination?.type === "back") window.history.back();
-    else router.push(redirectTo);
-    router.refresh();
+    startSaveNavigation(() => {
+      if (destination?.type === "href") router.push(destination.href);
+      else if (destination?.type === "back") window.history.go(destination.delta ?? -1);
+      else router.push(redirectTo);
+    });
   }
 
   function saveAndLeave() {
@@ -120,7 +128,7 @@ export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderAr
     setStatus,
     changeNote,
     setChangeNote,
-    saving,
+    saving: saving || isNavigatingAfterSave || navigation.isNavigating,
     error,
     leavePromptOpen: navigation.leavePromptOpen,
     pendingNavigation: navigation.pendingNavigation,

@@ -51,7 +51,7 @@ export function OrderDetailHeader({
             />
             {order.status !== "cancelled" && (
               <>
-                <Link href={`${basePath}/${order.id}/edit`} prefetch={false}>
+                <Link href={`${basePath}/${order.id}/edit`}>
                   <Button size="sm" variant="secondary" className="bg-white">
                     <Pencil className="size-4" />
                     Tahrirlash

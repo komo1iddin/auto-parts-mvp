@@ -85,7 +85,6 @@ function OrdersTableRow({
     <tr className="border-b border-gray-50 hover:bg-gray-50">
       <td className="px-5 py-3">
         <Link
-          prefetch={false}
           href={`${basePath}/${order.id}`}
           className="font-mono text-xs font-semibold text-blue-600 hover:underline"
         >
@@ -122,7 +121,7 @@ function OrdersTableRow({
       </td>
       <td className="px-5 py-3">
         <div className="flex justify-end gap-2">
-          <Link prefetch={false} href={`${basePath}/${order.id}`}>
+          <Link href={`${basePath}/${order.id}`}>
             <Button size="sm" variant="ghost">Ko'rish</Button>
           </Link>
           {order.status !== "cancelled" && (

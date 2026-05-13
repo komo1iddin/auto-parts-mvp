@@ -21,7 +21,7 @@ interface OrderBuilderProps {
 }
 
 export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = redirectTo }: OrderBuilderProps) {
-  const builder = useOrderBuilder({ existingOrder, redirectTo });
+  const builder = useOrderBuilder({ existingOrder, redirectTo, ordersPath });
 
   return (
     <div className="space-y-6">
