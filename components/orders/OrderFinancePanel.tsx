@@ -29,10 +29,29 @@ export function OrderFinancePanel({
   isAdmin,
   summary,
 }: OrderFinancePanelProps) {
+  const stats = [
+    { label: "Jami", value: formatCny(summary.clientTotal), className: "text-gray-900" },
+    { label: "To'landi", value: formatCny(summary.clientPaid), className: "text-gray-900" },
+    {
+      label: "Qoldiq",
+      value: formatCny(summary.clientBalance),
+      className: summary.clientBalance > 0 ? "text-red-600" : "text-green-600",
+    },
+    ...(isAdmin
+      ? [
+          {
+            label: "Foyda",
+            value: formatCny(summary.expectedGrossProfit),
+            className: summary.expectedGrossProfit >= 0 ? "text-green-600" : "text-red-600",
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="min-w-0 space-y-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-gray-900">Moliya</span>
             <span
@@ -44,43 +63,15 @@ export function OrderFinancePanel({
               {CLIENT_STATUS_LABELS[summary.clientPaymentStatus]}
             </span>
           </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
-            <span className="text-gray-500">
-              Jami{" "}
-              <span className="font-semibold text-gray-900">
-                {formatCny(summary.clientTotal)}
-              </span>
-            </span>
-            <span className="text-gray-500">
-              To'landi{" "}
-              <span className="font-semibold text-gray-900">
-                {formatCny(summary.clientPaid)}
-              </span>
-            </span>
-            <span className="text-gray-500">
-              Qoldiq{" "}
-              <span
-                className={cn(
-                  "font-semibold",
-                  summary.clientBalance > 0 ? "text-red-600" : "text-green-600"
-                )}
-              >
-                {formatCny(summary.clientBalance)}
-              </span>
-            </span>
-            {isAdmin && (
-              <span className="text-gray-500">
-                Foyda{" "}
-                <span
-                  className={cn(
-                    "font-semibold",
-                    summary.expectedGrossProfit >= 0 ? "text-green-600" : "text-red-600"
-                  )}
-                >
-                  {formatCny(summary.expectedGrossProfit)}
-                </span>
-              </span>
-            )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {stats.map((stat) => (
+              <div key={stat.label} className="min-w-32 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                <div className="text-xs font-medium text-gray-500">{stat.label}</div>
+                <div className={cn("mt-0.5 text-sm font-semibold", stat.className)}>
+                  {stat.value}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
         <Link

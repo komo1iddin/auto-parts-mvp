@@ -9,9 +9,10 @@ import { Modal } from "@/components/ui/Modal";
 interface CancelOrderButtonProps {
   orderId: string;
   orderNumber: string;
+  size?: "sm" | "md" | "lg";
 }
 
-export function CancelOrderButton({ orderId, orderNumber }: CancelOrderButtonProps) {
+export function CancelOrderButton({ orderId, orderNumber, size = "md" }: CancelOrderButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -24,7 +25,7 @@ export function CancelOrderButton({ orderId, orderNumber }: CancelOrderButtonPro
 
   return (
     <>
-      <Button variant="destructive" onClick={() => setOpen(true)} disabled={isPending}>
+      <Button size={size} variant="destructive" onClick={() => setOpen(true)} disabled={isPending}>
         <Trash2 className="size-4" />
         {isPending ? "O'chirilmoqda..." : "O'chirish"}
       </Button>

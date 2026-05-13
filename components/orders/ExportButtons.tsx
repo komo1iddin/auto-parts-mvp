@@ -1,17 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { FileSpreadsheet, Languages, Table2 } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, Languages, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { AlertDialog } from "@/components/ui/AlertDialog";
 
 interface ExportButtonsProps {
   orderId: string;
   supplierIds: string[];
   isAdmin?: boolean;
+  latestExportLabel?: string;
 }
 
-export function ExportButtons({ orderId, supplierIds, isAdmin = true }: ExportButtonsProps) {
+export function ExportButtons({
+  orderId,
+  supplierIds,
+  isAdmin = true,
+  latestExportLabel,
+}: ExportButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   async function doExport(type: string, language?: string, supplierId?: string) {
     const key = `${type}-${language ?? ""}-${supplierId ?? ""}`;
@@ -25,7 +34,7 @@ export function ExportButtons({ orderId, supplierIds, isAdmin = true }: ExportBu
 
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error ?? "Xatolik");
+        setErrorMessage(data.error ?? "Exportda xatolik");
         return;
       }
 
@@ -52,49 +61,91 @@ export function ExportButtons({ orderId, supplierIds, isAdmin = true }: ExportBu
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Export</h3>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => doExport("internal")}
-          disabled={loading === "internal--"}
-          title="Ichki Excel: barcha qatorlar, xarid/sotuv narxlari, ta'minotchi va izohlar kiradi; hech narsa yashirilmaydi."
-        >
-          <Table2 className="size-4" />
-          Ichki Excel
-        </Button>
+    <div className="relative">
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => setOpen((value) => !value)}
+        disabled={Boolean(loading)}
+      >
+        <FileSpreadsheet className="size-4" />
+        {loading ? "Export..." : "Export"}
+        <ChevronDown className="size-4" />
+      </Button>
 
-        {isAdmin && (
-          <>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => exportAllSuppliers("cn")}
-              disabled={loading?.startsWith("supplier-cn")}
-              title="CN Excel: ta'minotchiga kerakli kod, nom, brend, tur, miqdor, xarid narxi va izoh kiradi; sotuv narxi, foyda va ichki ma'lumotlar yashiriladi."
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Export menyusini yopish"
+            className="fixed inset-0 z-30 cursor-default"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute right-0 top-10 z-40 w-72 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+            <div className="border-b border-gray-100 px-3 py-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Excel export</div>
+              {latestExportLabel && (
+                <div className="mt-0.5 truncate text-xs text-gray-500">Oxirgi: {latestExportLabel}</div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => doExport("internal")}
+              disabled={loading === "internal--"}
+              className="grid w-full grid-cols-[2rem_1fr] items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
             >
-              <FileSpreadsheet className="size-4" />
-              Ta'minotchi Excel (CN)
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => exportAllSuppliers("en")}
-              disabled={loading?.startsWith("supplier-en")}
-              title="EN Excel: ta'minotchiga kerakli kod, nom, brend, tur, miqdor, xarid narxi va izoh kiradi; sotuv narxi, foyda va ichki ma'lumotlar yashiriladi."
-            >
-              <Languages className="size-4" />
-              Ta'minotchi Excel (EN)
-            </Button>
-          </>
-        )}
-      </div>
+              <span className="flex size-8 items-center justify-center text-gray-500">
+                <Table2 className="size-4" />
+              </span>
+              <span>
+                <span className="block font-medium text-gray-900">Ichki Excel</span>
+                <span className="block text-xs text-gray-500">Barcha narxlar va ichki ma'lumotlar</span>
+              </span>
+            </button>
 
-      {loading && (
-        <p className="text-xs text-gray-400 mt-2">Yuklab olinmoqda...</p>
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => exportAllSuppliers("cn")}
+                  disabled={loading?.startsWith("supplier-cn") || !supplierIds.length}
+                  className="grid w-full grid-cols-[2rem_1fr] items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <span className="flex size-8 items-center justify-center text-gray-500">
+                    <FileSpreadsheet className="size-4" />
+                  </span>
+                  <span>
+                    <span className="block font-medium text-gray-900">Ta'minotchi Excel (CN)</span>
+                    <span className="block text-xs text-gray-500">Har ta'minotchi uchun alohida fayl</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exportAllSuppliers("en")}
+                  disabled={loading?.startsWith("supplier-en") || !supplierIds.length}
+                  className="grid w-full grid-cols-[2rem_1fr] items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <span className="flex size-8 items-center justify-center text-gray-500">
+                    <Languages className="size-4" />
+                  </span>
+                  <span>
+                    <span className="block font-medium text-gray-900">Ta'minotchi Excel (EN)</span>
+                    <span className="block text-xs text-gray-500">Supplier-facing English export</span>
+                  </span>
+                </button>
+              </>
+            )}
+          </div>
+        </>
       )}
+
+      <AlertDialog
+        open={Boolean(errorMessage)}
+        title="Export xatoligi"
+        description={errorMessage}
+        confirmLabel="Tushunarli"
+        onConfirm={() => setErrorMessage("")}
+      />
     </div>
   );
 }
