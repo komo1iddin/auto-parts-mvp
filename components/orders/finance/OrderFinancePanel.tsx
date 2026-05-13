@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Landmark } from "lucide-react";
 import { type OrderFinanceSummary, type PaymentStatus } from "@/lib/order-finance";
 import { cn, formatCny } from "@/lib/utils";
 
@@ -29,45 +29,48 @@ export function OrderFinancePanel({
   isAdmin,
   summary,
 }: OrderFinancePanelProps) {
-  const stats = [
-    { label: "Jami", value: formatCny(summary.clientTotal), className: "text-gray-900" },
-    { label: "To'landi", value: formatCny(summary.clientPaid), className: "text-gray-900" },
+  const stats: { label: string; value: string; tone: FinanceTone }[] = [
+    { label: "Jami", value: formatCny(summary.clientTotal), tone: "neutral" },
+    { label: "To'landi", value: formatCny(summary.clientPaid), tone: "neutral" },
     {
       label: "Qoldiq",
       value: formatCny(summary.clientBalance),
-      className: summary.clientBalance > 0 ? "text-red-600" : "text-green-600",
+      tone: summary.clientBalance > 0 ? "danger" : "balance",
     },
     ...(isAdmin
       ? [
           {
             label: "Foyda",
             value: formatCny(summary.expectedGrossProfit),
-            className: summary.expectedGrossProfit >= 0 ? "text-green-600" : "text-red-600",
+            tone: (summary.expectedGrossProfit >= 0 ? "profit" : "danger") as FinanceTone,
           },
         ]
       : []),
   ];
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">Moliya</span>
+            <span className="flex size-8 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600">
+              <Landmark className="size-4" />
+            </span>
+            <h2 className="text-base font-semibold text-gray-950">Moliya</h2>
             <span
               className={cn(
-                "rounded-full px-2 py-0.5 text-xs font-medium",
+                "rounded-full px-2.5 py-1 text-xs font-semibold",
                 statusBadgeClass(summary.clientPaymentStatus)
               )}
             >
               {CLIENT_STATUS_LABELS[summary.clientPaymentStatus]}
             </span>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((stat) => (
-              <div key={stat.label} className="min-w-32 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+              <div key={stat.label} className={cn("min-w-32 rounded-lg border px-3 py-2.5", financeToneClasses[stat.tone].card)}>
                 <div className="text-xs font-medium text-gray-500">{stat.label}</div>
-                <div className={cn("mt-0.5 text-sm font-semibold", stat.className)}>
+                <div className={cn("mt-1 text-base font-semibold", financeToneClasses[stat.tone].value)}>
                   {stat.value}
                 </div>
               </div>
@@ -76,12 +79,33 @@ export function OrderFinancePanel({
         </div>
         <Link
           href={financePath}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:border-gray-300 hover:text-gray-900"
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-950"
         >
           Moliya paneli
           <ArrowRight className="size-4" />
         </Link>
       </div>
-    </div>
+    </section>
   );
 }
+
+type FinanceTone = "neutral" | "balance" | "profit" | "danger";
+
+const financeToneClasses: Record<FinanceTone, { card: string; value: string }> = {
+  neutral: {
+    card: "border-gray-100 bg-gray-50",
+    value: "text-gray-950",
+  },
+  balance: {
+    card: "border-sky-100 bg-sky-50/60",
+    value: "text-sky-700",
+  },
+  profit: {
+    card: "border-emerald-100 bg-emerald-50/60",
+    value: "text-emerald-700",
+  },
+  danger: {
+    card: "border-red-100 bg-red-50/60",
+    value: "text-red-700",
+  },
+};

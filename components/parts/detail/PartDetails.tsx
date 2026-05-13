@@ -76,7 +76,7 @@ function DetailItem({
   return (
     <div className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
-      <p className={mono ? "mt-1 font-mono text-sm font-semibold text-gray-800" : "mt-1 text-sm text-gray-800"}>
+      <p className={mono ? "mt-1 font-sans text-sm font-semibold tabular-nums text-gray-800" : "mt-1 text-sm text-gray-800"}>
         {value || "—"}
       </p>
     </div>

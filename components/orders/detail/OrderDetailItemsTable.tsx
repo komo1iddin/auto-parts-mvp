@@ -1,3 +1,4 @@
+import { PackageSearch } from "lucide-react";
 import { OrderPartCodeButton } from "@/components/orders/detail/OrderPartCodeButton";
 import type { OrderDetail } from "@/components/orders/types/orderDetailTypes";
 import { profitClass, toNumber } from "@/components/orders/detail/orderDetailUtils";
@@ -24,16 +25,21 @@ export function OrderDetailItemsTable({ order, isAdmin }: OrderDetailItemsTableP
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
       <div className="border-b border-gray-100 px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold text-gray-800">Buyurtma qismlari</h2>
+          <div className="flex items-center gap-2">
+            <span className="flex size-8 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600">
+              <PackageSearch className="size-4" />
+            </span>
+            <h2 className="text-base font-semibold text-gray-950">Buyurtma qismlari</h2>
+          </div>
           <span className="text-sm text-gray-500">{itemCount} ta qism</span>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <SummaryValue label="Qismlar" value={itemCount} />
-          <SummaryValue label="Miqdor" value={totalQty} />
-          {isAdmin && <SummaryValue label="Xarid jami" value={formatCny(totalPurchase)} className="text-red-600" />}
-          <SummaryValue label="Sotuv jami" value={formatCny(totalSelling)} className="text-green-600" />
-          {isAdmin && <SummaryValue label="Foyda" value={formatCny(totalProfit)} className={profitClass(totalProfit)} />}
-          {isAdmin && <SummaryValue label="Margin" value={`${margin.toFixed(1)}%`} className={profitClass(totalProfit)} />}
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <SummaryValue label="Qismlar" value={itemCount} tone="neutral" />
+          <SummaryValue label="Miqdor" value={totalQty} tone="neutral" />
+          {isAdmin && <SummaryValue label="Xarid jami" value={formatCny(totalPurchase)} tone="cost" />}
+          <SummaryValue label="Sotuv jami" value={formatCny(totalSelling)} tone="revenue" />
+          {isAdmin && <SummaryValue label="Foyda" value={formatCny(totalProfit)} tone={totalProfit >= 0 ? "profit" : "cost"} />}
+          {isAdmin && <SummaryValue label="Margin" value={`${margin.toFixed(1)}%`} tone={totalProfit >= 0 ? "margin" : "cost"} />}
         </div>
       </div>
 
@@ -60,7 +66,7 @@ export function OrderDetailItemsTable({ order, isAdmin }: OrderDetailItemsTableP
                 <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="px-4 py-2.5 text-left align-middle whitespace-nowrap">
                     <div className="flex items-center justify-start gap-1.5">
-                      <OrderPartCodeButton code={item.partCode} isAdmin={isAdmin} />
+                      <OrderPartCodeButton item={item} isAdmin={isAdmin} />
                       {count > 1 && (
                         <span
                           title={`Bu kod buyurtmada ${count} marta mavjud`}
@@ -89,11 +95,37 @@ export function OrderDetailItemsTable({ order, isAdmin }: OrderDetailItemsTableP
   );
 }
 
-function SummaryValue({ label, value, className }: { label: string; value: string | number; className?: string }) {
+type SummaryTone = "neutral" | "cost" | "revenue" | "profit" | "margin";
+
+const summaryToneClasses: Record<SummaryTone, { card: string; value: string }> = {
+  neutral: {
+    card: "border-gray-100 bg-gray-50",
+    value: "text-gray-900",
+  },
+  cost: {
+    card: "border-red-100 bg-red-50/70",
+    value: "text-red-700",
+  },
+  revenue: {
+    card: "border-blue-100 bg-blue-50/70",
+    value: "text-blue-700",
+  },
+  profit: {
+    card: "border-emerald-100 bg-emerald-50/70",
+    value: "text-emerald-700",
+  },
+  margin: {
+    card: "border-violet-100 bg-violet-50/70",
+    value: "text-violet-700",
+  },
+};
+
+function SummaryValue({ label, value, tone }: { label: string; value: string | number; tone: SummaryTone }) {
+  const classes = summaryToneClasses[tone];
   return (
-    <div className="min-w-32 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+    <div className={cn("min-w-32 rounded-lg border px-3 py-2.5", classes.card)}>
       <div className="text-xs font-medium text-gray-500">{label}</div>
-      <div className={cn("mt-0.5 text-sm font-semibold text-gray-800", className)}>{value}</div>
+      <div className={cn("mt-1 text-base font-semibold", classes.value)}>{value}</div>
     </div>
   );
 }
