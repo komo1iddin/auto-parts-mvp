@@ -1,21 +1,32 @@
 "use client";
 
 import { OrderItemsTableRow } from "@/components/orders/builder/OrderItemsTableRow";
-import type { OrderItem, Supplier } from "@/components/orders/types/orderBuilderTypes";
+import type { OrderItem, SettingOption, Supplier } from "@/components/orders/types/orderBuilderTypes";
 import { PART_TYPES } from "@/lib/utils";
 
 interface Props {
   items: OrderItem[];
   isAdmin: boolean;
   suppliers: Supplier[];
+  partQualityTypes: SettingOption[];
   duplicateCodes: Set<string>;
   updateField: <K extends keyof OrderItem>(partId: string, field: K, value: OrderItem[K]) => void;
   updateQty: (partId: string, qty: number) => void;
   onDelete: (item: OrderItem) => void;
 }
 
-export function OrderItemsTable({ items, isAdmin, suppliers, duplicateCodes, updateField, updateQty, onDelete }: Props) {
-  const typeOptions = Object.entries(PART_TYPES).map(([key, label]) => ({ value: key, label }));
+export function OrderItemsTable({ items, isAdmin, suppliers, partQualityTypes, duplicateCodes, updateField, updateQty, onDelete }: Props) {
+  const baseTypeOptions = partQualityTypes.length
+    ? partQualityTypes.map((option) => ({ value: option.value, label: option.label }))
+    : Object.entries(PART_TYPES).map(([key, label]) => ({ value: key, label }));
+  const unknownTypeOptions = Array.from(
+    new Set(
+      items
+        .map((item) => item.type)
+        .filter((type) => type && !baseTypeOptions.some((option) => option.value === type))
+    )
+  ).map((type) => ({ value: type, label: type }));
+  const typeOptions = [...baseTypeOptions, ...unknownTypeOptions];
   const supplierOptions = [
     { value: "", label: "—" },
     ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name })),

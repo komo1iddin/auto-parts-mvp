@@ -8,6 +8,12 @@ export interface Customer {
   name: string;
 }
 
+export interface SettingOption {
+  id: string;
+  value: string;
+  label: string;
+}
+
 export interface PartSearchResult {
   id: string;
   code: string;

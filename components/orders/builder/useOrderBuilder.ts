@@ -103,6 +103,7 @@ export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderAr
     searching: search.searching,
     suppliers: search.suppliers,
     customers: search.customers,
+    partQualityTypes: search.partQualityTypes,
     customerId,
     setCustomerId,
     items: orderItems.items,

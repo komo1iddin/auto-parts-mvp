@@ -38,6 +38,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = 
         items={builder.items}
         isAdmin={isAdmin}
         suppliers={builder.suppliers}
+        partQualityTypes={builder.partQualityTypes}
         duplicateCodes={builder.duplicateCodes}
         updateField={builder.updateField}
         updateQty={builder.updateQty}
