@@ -23,6 +23,8 @@ const tableByModel = {
   orderItem: "order_items",
   orderRevision: "order_revisions",
   orderExport: "order_exports",
+  clientPayment: "client_payments",
+  supplierPayment: "supplier_payments",
 } as const;
 
 const columnByField: Record<string, string> = {
@@ -52,20 +54,34 @@ const columnByField: Record<string, string> = {
   exportType: "export_type",
   fileName: "file_name",
   exportedBy: "exported_by",
+  amountCny: "amount_cny",
+  paymentDate: "payment_date",
+  paymentMethod: "payment_method",
 };
 
 const fieldByColumn = Object.fromEntries(
   Object.entries(columnByField).map(([field, column]) => [column, field])
 );
 
+const dateFields = new Set(["createdAt", "updatedAt", "paymentDate"]);
+
 function toDbField(field: string) {
   return columnByField[field] ?? field;
+}
+
+function fromDbValue(field: string, value: unknown) {
+  if (value == null) return value;
+  if (dateFields.has(field) && typeof value === "string") return new Date(value);
+  return value;
 }
 
 function fromDbRow<T = AnyRecord>(row: AnyRecord | null): T | null {
   if (!row) return null;
   return Object.fromEntries(
-    Object.entries(row).map(([key, value]) => [fieldByColumn[key] ?? key, value])
+    Object.entries(row).map(([key, value]) => {
+      const field = fieldByColumn[key] ?? key;
+      return [field, fromDbValue(field, value)];
+    })
   ) as T;
 }
 
@@ -229,10 +245,16 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
 
   if (model === "order") {
     const userIds = unique(rows.flatMap((row) => [row.createdBy, row.updatedBy]));
-    const [users, items] = await Promise.all([
+    const [users, items, clientPayments, supplierPayments] = await Promise.all([
       include.creator || include.updater ? selectByIds("user", userIds) : Promise.resolve(new Map()),
       include._count?.select?.items || include.items
         ? selectWhereIn("orderItem", "orderId", rows.map((row) => row.id))
+        : Promise.resolve([]),
+      include.clientPayments
+        ? selectWhereIn("clientPayment", "orderId", rows.map((row) => row.id))
+        : Promise.resolve([]),
+      include.supplierPayments
+        ? selectWhereIn("supplierPayment", "orderId", rows.map((row) => row.id))
         : Promise.resolve([]),
     ]);
     const rowIds = new Set(rows.map((row) => row.id));
@@ -240,6 +262,16 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
     for (const item of items) {
       if (!rowIds.has(item.orderId)) continue;
       itemsByOrder.set(item.orderId, [...(itemsByOrder.get(item.orderId) ?? []), item]);
+    }
+    const clientPaymentsByOrder = new Map<string, AnyRecord[]>();
+    for (const payment of clientPayments) {
+      if (!rowIds.has(payment.orderId)) continue;
+      clientPaymentsByOrder.set(payment.orderId, [...(clientPaymentsByOrder.get(payment.orderId) ?? []), payment]);
+    }
+    const supplierPaymentsByOrder = new Map<string, AnyRecord[]>();
+    for (const payment of supplierPayments) {
+      if (!rowIds.has(payment.orderId)) continue;
+      supplierPaymentsByOrder.set(payment.orderId, [...(supplierPaymentsByOrder.get(payment.orderId) ?? []), payment]);
     }
 
     return rows.map((row) => {
@@ -253,9 +285,63 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
           ? { updater: row.updatedBy ? pick(users.get(row.updatedBy), include.updater.select) : null }
           : {}),
         ...(include.items ? { items: orderItems.sort(compareBy(include.items.orderBy)) } : {}),
+        ...(include.clientPayments
+          ? { clientPayments: (clientPaymentsByOrder.get(row.id) ?? []).sort(compareBy(include.clientPayments.orderBy)) }
+          : {}),
+        ...(include.supplierPayments
+          ? { supplierPayments: (supplierPaymentsByOrder.get(row.id) ?? []).sort(compareBy(include.supplierPayments.orderBy)) }
+          : {}),
         ...(include._count?.select?.items ? { _count: { items: orderItems.length } } : {}),
       };
     });
+  }
+
+  if (model === "clientPayment") {
+    const users = include.creator
+      ? await selectByIds("user", rows.map((row) => row.createdBy))
+      : new Map<string, AnyRecord>();
+
+    return rows.map((row) => ({
+      ...row,
+      ...(include.creator
+        ? {
+            creator: row.createdBy
+              ? include.creator.select
+                ? pick(users.get(row.createdBy), include.creator.select)
+                : users.get(row.createdBy) ?? null
+              : null,
+          }
+        : {}),
+    }));
+  }
+
+  if (model === "supplierPayment") {
+    const [users, suppliers] = await Promise.all([
+      include.creator ? selectByIds("user", rows.map((row) => row.createdBy)) : Promise.resolve(new Map()),
+      include.supplier ? selectByIds("supplier", rows.map((row) => row.supplierId)) : Promise.resolve(new Map()),
+    ]);
+
+    return rows.map((row) => ({
+      ...row,
+      ...(include.creator
+        ? {
+            creator: row.createdBy
+              ? include.creator.select
+                ? pick(users.get(row.createdBy), include.creator.select)
+                : users.get(row.createdBy) ?? null
+              : null,
+          }
+        : {}),
+      ...(include.supplier
+        ? {
+            supplier: row.supplierId
+              ? include.supplier.select
+                ? pick(suppliers.get(row.supplierId), include.supplier.select)
+                : suppliers.get(row.supplierId) ?? null
+              : null,
+          }
+        : {}),
+    }));
   }
 
   return Promise.all(rows.map((row) => applyIncludes(model, row, include)));
@@ -285,6 +371,16 @@ async function applyIncludes(model: keyof typeof tableByModel, row: AnyRecord | 
       next.items = (await selectAll("orderItem"))
         .filter((item) => item.orderId === row.id)
         .sort(compareBy(include.items.orderBy));
+    }
+    if (include.clientPayments) {
+      next.clientPayments = (await selectAll("clientPayment"))
+        .filter((payment) => payment.orderId === row.id)
+        .sort(compareBy(include.clientPayments.orderBy));
+    }
+    if (include.supplierPayments) {
+      next.supplierPayments = (await selectAll("supplierPayment"))
+        .filter((payment) => payment.orderId === row.id)
+        .sort(compareBy(include.supplierPayments.orderBy));
     }
     if (include.creator) {
       const creator = await users(row.createdBy);
@@ -319,10 +415,32 @@ async function applyIncludes(model: keyof typeof tableByModel, row: AnyRecord | 
     return next;
   }
 
+  if (model === "clientPayment") {
+    const next = { ...row };
+    if (include.creator) {
+      const creator = row.createdBy ? await prisma.user.findUnique({ where: { id: row.createdBy } }) : null;
+      next.creator = creator && include.creator.select ? pick(creator, include.creator.select) : creator;
+    }
+    return next;
+  }
+
+  if (model === "supplierPayment") {
+    const next = { ...row };
+    if (include.creator) {
+      const creator = row.createdBy ? await prisma.user.findUnique({ where: { id: row.createdBy } }) : null;
+      next.creator = creator && include.creator.select ? pick(creator, include.creator.select) : creator;
+    }
+    if (include.supplier) {
+      const supplier = row.supplierId ? await prisma.supplier.findUnique({ where: { id: row.supplierId } }) : null;
+      next.supplier = supplier && include.supplier.select ? pick(supplier, include.supplier.select) : supplier;
+    }
+    return next;
+  }
+
   return row;
 }
 
-function pick(row: AnyRecord, select: AnyRecord) {
+function pick(row: AnyRecord | null | undefined, select: AnyRecord) {
   if (!row) return null;
   return Object.fromEntries(Object.keys(select).filter((key) => select[key]).map((key) => [key, row[key]]));
 }
@@ -340,6 +458,27 @@ function modelApi(model: keyof typeof tableByModel) {
       const { count, error } = await query;
       if (error) throw new Error(error.message);
       return count ?? 0;
+    },
+
+    async groupBy(args: AnyRecord) {
+      const by = Array.isArray(args.by) ? args.by : [args.by];
+      const rows = await selectRows(model, { where: args.where });
+      const groups = new Map<string, AnyRecord>();
+
+      for (const row of rows) {
+        const groupFields = Object.fromEntries(by.map((field: string) => [field, row[field]]));
+        const key = JSON.stringify(groupFields);
+        const group = groups.get(key) ?? { ...groupFields, _count: {} };
+        const countFields = args._count === true ? by : Object.keys(args._count ?? {});
+
+        for (const field of countFields) {
+          group._count[field] = (group._count[field] ?? 0) + 1;
+        }
+
+        groups.set(key, group);
+      }
+
+      return [...groups.values()];
     },
 
     async findUnique(args: AnyRecord) {
@@ -438,4 +577,6 @@ export const prisma: any = {
   orderItem: modelApi("orderItem"),
   orderRevision: modelApi("orderRevision"),
   orderExport: modelApi("orderExport"),
+  clientPayment: modelApi("clientPayment"),
+  supplierPayment: modelApi("supplierPayment"),
 };

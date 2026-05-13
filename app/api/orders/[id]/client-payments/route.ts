@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { forbidden, requireAdminOrManager, unauthorized } from "@/lib/auth";
 import { revalidateAppData } from "@/lib/data";
 import { PAYMENT_METHODS } from "@/lib/order-finance";
+import { syncOrderClientPaymentStatus } from "@/lib/order-status";
 
 function isValidMethod(method: string) {
   return PAYMENT_METHODS.includes(method as (typeof PAYMENT_METHODS)[number]);
@@ -61,6 +62,7 @@ export async function POST(
     },
   });
 
+  await syncOrderClientPaymentStatus(id, user.id);
   revalidateAppData("orders");
   return Response.json({ payment }, { status: 201 });
 }

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrManager, unauthorized } from "@/lib/auth";
 import { revalidateAppData } from "@/lib/data";
+import { isEditableOrderStatus } from "@/lib/utils";
 
 export async function GET(
   _req: NextRequest,
@@ -66,6 +67,9 @@ export async function PUT(
   const { id } = await params;
   const body = await req.json();
   const { items, status, changeNote } = body;
+  if (status != null && !isEditableOrderStatus(status)) {
+    return Response.json({ error: "Buyurtma holati noto'g'ri" }, { status: 400 });
+  }
 
   const existing = await prisma.order.findUnique({
     where: { id },

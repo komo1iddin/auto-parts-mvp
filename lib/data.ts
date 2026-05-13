@@ -1,5 +1,14 @@
 import { unstable_cache, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import {
+  calculateOrderFinance,
+  type FinanceItem,
+  type FinancePayment,
+  type OrderFinanceStatus,
+  type OrderFinanceSummary,
+  type PaymentStatus,
+} from "@/lib/order-finance";
+import { ORDER_STATUS_KEYS } from "@/lib/utils";
 
 export const DATA_TAGS = {
   dashboard: "dashboard",
@@ -15,9 +24,111 @@ export function revalidateAppData(...tags: Array<keyof typeof DATA_TAGS>) {
   revalidateTag(DATA_TAGS.dashboard, "max");
 }
 
+type DashboardRawOrder = {
+  items: FinanceItem[];
+  clientPayments: FinancePayment[];
+  supplierPayments: FinancePayment[];
+};
+
+export interface DashboardRecentOrderFinance {
+  clientTotal: number;
+  supplierTotal: number;
+  expectedGrossProfit: number;
+  clientPaid: number;
+  supplierPaid: number;
+  clientBalance: number;
+  supplierBalance: number;
+  clientPaymentStatus: PaymentStatus;
+  orderFinanceStatus: OrderFinanceStatus;
+}
+
+export interface DashboardFinanceTotals {
+  clientTotal: number;
+  supplierTotal: number;
+  expectedGrossProfit: number;
+  clientPaid: number;
+  supplierPaid: number;
+  clientBalance: number;
+  supplierBalance: number;
+  openOrdersCount: number;
+  clientBalanceOrdersCount: number;
+  supplierBalanceOrdersCount: number;
+  financeStatusCounts: Record<OrderFinanceStatus, number>;
+  orderStatusCounts: Record<string, number>;
+}
+
+const FINANCE_STATUS_KEYS: OrderFinanceStatus[] = [
+  "waiting_client_payment",
+  "client_partially_paid",
+  "ready_to_pay_supplier",
+  "supplier_partially_paid",
+  "supplier_paid",
+  "closed",
+];
+
+function summarizeDashboardFinance(orders: DashboardRawOrder[]): DashboardFinanceTotals {
+  const totals: DashboardFinanceTotals = {
+    clientTotal: 0,
+    supplierTotal: 0,
+    expectedGrossProfit: 0,
+    clientPaid: 0,
+    supplierPaid: 0,
+    clientBalance: 0,
+    supplierBalance: 0,
+    openOrdersCount: 0,
+    clientBalanceOrdersCount: 0,
+    supplierBalanceOrdersCount: 0,
+    financeStatusCounts: Object.fromEntries(FINANCE_STATUS_KEYS.map((status) => [status, 0])) as Record<OrderFinanceStatus, number>,
+    orderStatusCounts: Object.fromEntries(ORDER_STATUS_KEYS.map((status) => [status, 0])),
+  };
+
+  for (const order of orders) {
+    const finance = calculateOrderFinance(order.items, order.clientPayments, order.supplierPayments);
+    totals.clientTotal += finance.clientTotal;
+    totals.supplierTotal += finance.supplierTotal;
+    totals.expectedGrossProfit += finance.expectedGrossProfit;
+    totals.clientPaid += finance.clientPaid;
+    totals.supplierPaid += finance.supplierPaid;
+    totals.clientBalance += finance.clientBalance;
+    totals.supplierBalance += finance.supplierBalance;
+    if (finance.orderFinanceStatus !== "closed") totals.openOrdersCount += 1;
+    if (finance.clientBalance > 0) totals.clientBalanceOrdersCount += 1;
+    if (finance.supplierBalance > 0) totals.supplierBalanceOrdersCount += 1;
+    totals.financeStatusCounts[finance.orderFinanceStatus] += 1;
+  }
+
+  return totals;
+}
+
+function pickRecentOrderFinance(summary: OrderFinanceSummary): DashboardRecentOrderFinance {
+  return {
+    clientTotal: summary.clientTotal,
+    supplierTotal: summary.supplierTotal,
+    expectedGrossProfit: summary.expectedGrossProfit,
+    clientPaid: summary.clientPaid,
+    supplierPaid: summary.supplierPaid,
+    clientBalance: summary.clientBalance,
+    supplierBalance: summary.supplierBalance,
+    clientPaymentStatus: summary.clientPaymentStatus,
+    orderFinanceStatus: summary.orderFinanceStatus,
+  };
+}
+
+function withDashboardFinance<T extends DashboardRawOrder>(order: T) {
+  const finance = calculateOrderFinance(order.items, order.clientPayments, order.supplierPayments);
+  return {
+    ...order,
+    finance: pickRecentOrderFinance(finance),
+    totalQty: order.items.reduce((sum, item) => sum + item.quantity, 0),
+    items: undefined,
+    clientPayments: undefined,
+    supplierPayments: undefined,
+  };
+}
+
 export const getAdminDashboardData = unstable_cache(
   async () => {
-    const [partsCount, ordersCount, suppliersCount, usersCount, recentOrders] =
+    const [partsCount, ordersCount, suppliersCount, usersCount, activeOrders, statusCounts, recentOrders] =
       await Promise.all([
         prisma.part.count(),
         prisma.order.count({ where: { status: { not: "cancelled" } } }),
@@ -25,16 +136,60 @@ export const getAdminDashboardData = unstable_cache(
         prisma.user.count(),
         prisma.order.findMany({
           where: { status: { not: "cancelled" } },
+          include: {
+            items: {
+              select: {
+                supplierId: true,
+                supplierName: true,
+                quantity: true,
+                purchasePriceCny: true,
+                sellingPriceCny: true,
+              },
+            },
+            clientPayments: { select: { amountCny: true } },
+            supplierPayments: { select: { supplierId: true, amountCny: true } },
+          },
+        }),
+        prisma.order.groupBy({
+          by: ["status"],
+          where: { status: { not: "cancelled" } },
+          _count: { status: true },
+        }),
+        prisma.order.findMany({
+          where: { status: { not: "cancelled" } },
           orderBy: { updatedAt: "desc" },
           take: 5,
           include: {
             creator: { select: { name: true } },
             _count: { select: { items: true } },
+            items: {
+              select: {
+                supplierId: true,
+                supplierName: true,
+                quantity: true,
+                purchasePriceCny: true,
+                sellingPriceCny: true,
+              },
+            },
+            clientPayments: { select: { amountCny: true } },
+            supplierPayments: { select: { supplierId: true, amountCny: true } },
           },
         }),
       ]);
 
-    return { partsCount, ordersCount, suppliersCount, usersCount, recentOrders };
+    const financeTotals = summarizeDashboardFinance(activeOrders);
+    for (const row of statusCounts) {
+      financeTotals.orderStatusCounts[row.status] = row._count.status;
+    }
+
+    return {
+      partsCount,
+      ordersCount,
+      suppliersCount,
+      usersCount,
+      financeTotals,
+      recentOrders: recentOrders.map(withDashboardFinance),
+    };
   },
   ["admin-dashboard"],
   {
@@ -51,18 +206,62 @@ export const getAdminDashboardData = unstable_cache(
 
 export const getManagerDashboardData = unstable_cache(
   async (userId: string) => {
-    const [myOrdersCount, draftCount, recentOrders] = await Promise.all([
+    const [myOrdersCount, draftCount, myOrders, statusCounts, recentOrders] = await Promise.all([
       prisma.order.count({ where: { createdBy: userId, status: { not: "cancelled" } } }),
       prisma.order.count({ where: { createdBy: userId, status: "draft" } }),
       prisma.order.findMany({
-        where: { createdBy: userId },
+        where: { createdBy: userId, status: { not: "cancelled" } },
+        include: {
+          items: {
+            select: {
+              supplierId: true,
+              supplierName: true,
+              quantity: true,
+              purchasePriceCny: true,
+              sellingPriceCny: true,
+            },
+          },
+          clientPayments: { select: { amountCny: true } },
+          supplierPayments: { select: { supplierId: true, amountCny: true } },
+        },
+      }),
+      prisma.order.groupBy({
+        by: ["status"],
+        where: { createdBy: userId, status: { not: "cancelled" } },
+        _count: { status: true },
+      }),
+      prisma.order.findMany({
+        where: { createdBy: userId, status: { not: "cancelled" } },
         orderBy: { updatedAt: "desc" },
         take: 5,
-        include: { _count: { select: { items: true } } },
+        include: {
+          _count: { select: { items: true } },
+          items: {
+            select: {
+              supplierId: true,
+              supplierName: true,
+              quantity: true,
+              purchasePriceCny: true,
+              sellingPriceCny: true,
+            },
+          },
+          clientPayments: { select: { amountCny: true } },
+          supplierPayments: { select: { supplierId: true, amountCny: true } },
+        },
       }),
     ]);
 
-    return { myOrdersCount, draftCount, recentOrders };
+    const financeTotals = summarizeDashboardFinance(myOrders);
+    for (const row of statusCounts) {
+      financeTotals.orderStatusCounts[row.status] = row._count.status;
+    }
+
+    return {
+      myOrdersCount,
+      draftCount,
+      financeTotals,
+      recentOrders: recentOrders.map(withDashboardFinance),
+    };
   },
   ["manager-dashboard"],
   {
@@ -81,7 +280,7 @@ export const getOrdersList = unstable_cache(
     const baseWhere = {
       ...(role === "manager" ? { createdBy: userId } : {}),
     };
-    const STATUS_KEYS = ["draft", "confirmed", "updated", "cancelled"] as const;
+    const STATUS_KEYS = ORDER_STATUS_KEYS;
 
     const [rawOrders, total, ...statusCountsArr] = await Promise.all([
       prisma.order.findMany({

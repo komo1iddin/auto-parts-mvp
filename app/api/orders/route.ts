@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrManager, unauthorized } from "@/lib/auth";
 import { getOrdersList, revalidateAppData } from "@/lib/data";
-import { generateOrderNumber, buildOrderNumber } from "@/lib/utils";
+import { generateOrderNumber, buildOrderNumber, isEditableOrderStatus } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
   let user;
@@ -56,6 +56,9 @@ export async function POST(req: NextRequest) {
   const { items, status = "draft" } = await req.json();
   if (!items?.length) {
     return Response.json({ error: "Kamida bitta qism kerak" }, { status: 400 });
+  }
+  if (!isEditableOrderStatus(status)) {
+    return Response.json({ error: "Buyurtma holati noto'g'ri" }, { status: 400 });
   }
 
   const today = new Date();

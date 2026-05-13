@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { ORDER_EDIT_STATUS_OPTIONS } from "@/lib/utils";
 
 interface OrderBuilderOptionsProps {
   status: string;
@@ -22,14 +23,17 @@ export function OrderBuilderOptions({
 }: OrderBuilderOptionsProps) {
   return (
     <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5">
-      <div className="w-48">
+      <div className="w-full max-w-xs">
         <Select
           label="Holat"
           value={status}
           onChange={(event) => onStatusChange(event.target.value)}
         >
-          <option value="draft">Qoralama</option>
-          <option value="confirmed">Tasdiqlangan</option>
+          {ORDER_EDIT_STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </Select>
       </div>
 

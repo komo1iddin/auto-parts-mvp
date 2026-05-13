@@ -1,4 +1,4 @@
-import { ORDER_STATUSES } from "@/lib/utils";
+import { ORDER_STATUS_OPTIONS, ORDER_STATUSES } from "@/lib/utils";
 
 interface OrdersListToolbarProps {
   status: string;
@@ -21,7 +21,7 @@ export function OrdersListToolbar({
     <div className="space-y-3 border-b border-gray-100 p-4">
       <div className="flex items-center justify-between gap-4">
         <div className="inline-flex flex-wrap gap-0.5 rounded-md bg-muted p-1">
-          {["", "draft", "confirmed", "updated", "cancelled"].map((option) => {
+          {["", ...ORDER_STATUS_OPTIONS.map((statusOption) => statusOption.value)].map((option) => {
             const count = statusCounts?.[option];
             return (
               <button
