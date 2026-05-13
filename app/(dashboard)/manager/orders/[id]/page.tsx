@@ -60,17 +60,9 @@ export default async function ManagerOrderDetailPage({
       financePanel={
         <OrderFinancePanel
           orderId={order.id}
+          financePath={`/manager/orders/${order.id}/finance`}
           isAdmin={false}
-          canManageClientPayments={Boolean(user?.canCreateClientPayments)}
           summary={clientFinance}
-          clientPayments={clientPayments.map((payment) => ({
-            ...payment,
-            amountCny: payment.amountCny.toString(),
-            paymentDate: payment.paymentDate.toISOString(),
-            createdAt: payment.createdAt.toISOString(),
-          }))}
-          supplierPayments={[]}
-          suppliers={[]}
         />
       }
     />

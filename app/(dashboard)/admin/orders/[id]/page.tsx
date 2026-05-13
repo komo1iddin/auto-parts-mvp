@@ -46,9 +46,6 @@ export default async function AdminOrderDetailPage({
   const clientPayments = order.clientPayments ?? [];
   const supplierPayments = order.supplierPayments ?? [];
   const finance = calculateOrderFinance(order.items ?? [], clientPayments, supplierPayments);
-  const suppliers = finance.supplierBreakdown
-    .filter((supplier) => supplier.supplierId)
-    .map((supplier) => ({ id: supplier.supplierId!, name: supplier.supplierName }));
 
   return (
     <OrderDetailView
@@ -59,22 +56,9 @@ export default async function AdminOrderDetailPage({
       financePanel={
         <OrderFinancePanel
           orderId={order.id}
+          financePath={`/admin/orders/${order.id}/finance`}
           isAdmin={true}
-          canManageClientPayments={true}
           summary={finance}
-          clientPayments={clientPayments.map((payment) => ({
-            ...payment,
-            amountCny: payment.amountCny.toString(),
-            paymentDate: payment.paymentDate.toISOString(),
-            createdAt: payment.createdAt.toISOString(),
-          }))}
-          supplierPayments={supplierPayments.map((payment) => ({
-            ...payment,
-            amountCny: payment.amountCny.toString(),
-            paymentDate: payment.paymentDate.toISOString(),
-            createdAt: payment.createdAt.toISOString(),
-          }))}
-          suppliers={suppliers}
         />
       }
     />
