@@ -26,6 +26,7 @@ export function OrdersTable({
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
             <th className="px-5 py-3 text-left text-xs font-medium text-gray-500">Raqam</th>
+            <th className="px-5 py-3 text-left text-xs font-medium text-gray-500">Mijoz</th>
             <th className="px-5 py-3 text-left text-xs font-medium text-gray-500">Holat</th>
             <th className="px-5 py-3 text-left text-xs font-medium text-gray-500">Ver.</th>
             <th className="px-5 py-3 text-left text-xs font-medium text-gray-500">Qismlar</th>
@@ -52,7 +53,7 @@ export function OrdersTable({
           {!orders.length && (
             <tr>
               <td
-                colSpan={(isAdmin ? 10 : 9) + (canShowCreator ? 1 : 0)}
+                colSpan={(isAdmin ? 11 : 10) + (canShowCreator ? 1 : 0)}
                 className="px-5 py-12 text-center text-gray-400"
               >
                 Buyurtmalar yo'q
@@ -90,6 +91,9 @@ function OrdersTableRow({
         >
           {order.currentOrderNumber}
         </Link>
+      </td>
+      <td className="max-w-[140px] truncate px-5 py-3 text-xs font-medium text-gray-700">
+        {order.customer?.name ?? "—"}
       </td>
       <td className="px-5 py-3">
         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${status?.color ?? ""}`}>

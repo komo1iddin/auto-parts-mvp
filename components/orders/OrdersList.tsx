@@ -65,6 +65,7 @@ function orderMatchesSearch(order: OrderListItem, search: string) {
   const query = search.toLowerCase();
   return (
     order.currentOrderNumber.toLowerCase().includes(query) ||
+    order.customer?.name?.toLowerCase().includes(query) ||
     order.supplierNames?.some((supplier) => supplier?.toLowerCase().includes(query)) ||
     order.creator?.name?.toLowerCase().includes(query)
   );

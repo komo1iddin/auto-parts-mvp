@@ -21,6 +21,7 @@ interface UseOrderBuilderArgs {
     id: string;
     items: OrderItem[];
     status: string;
+    customerId?: string | null;
   };
   redirectTo: string;
 }
@@ -29,11 +30,13 @@ export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderAr
   const router = useRouter();
   const search = usePartSearch();
   const orderItems = useOrderItems(existingOrder?.items ?? []);
+  const [customerId, setCustomerId] = useState(existingOrder?.customerId ?? "");
   const [status, setStatus] = useState(existingOrder?.status ?? "draft");
   const [changeNote, setChangeNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [originalItems] = useState<OrderItem[]>(() => existingOrder?.items ?? []);
+  const [originalCustomerId] = useState(existingOrder?.customerId ?? "");
   const [originalStatus] = useState(existingOrder?.status ?? "draft");
   const changelogPreview = useMemo(
     () => buildOrderChangelog(originalItems, orderItems.items),
@@ -41,9 +44,10 @@ export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderAr
   );
   const isDirty = useMemo(() => (
     serializeItems(orderItems.items) !== serializeItems(originalItems) ||
+    customerId !== originalCustomerId ||
     status !== originalStatus ||
     changeNote.trim().length > 0
-  ), [changeNote, orderItems.items, originalItems, originalStatus, status]);
+  ), [changeNote, customerId, orderItems.items, originalCustomerId, originalItems, originalStatus, status]);
   const navigation = useUnsavedOrderNavigation({
     enabled: Boolean(existingOrder),
     isDirty,
@@ -60,6 +64,10 @@ export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderAr
       setError("Kamida bitta qism kerak");
       return;
     }
+    if (!customerId) {
+      setError("Mijoz tanlash majburiy");
+      return;
+    }
 
     setSaving(true);
     setError("");
@@ -67,7 +75,7 @@ export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderAr
     const response = await fetch(existingOrder ? `/api/orders/${existingOrder.id}` : "/api/orders", {
       method: existingOrder ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: orderItems.items, status, changeNote: finalNote }),
+      body: JSON.stringify({ customerId, items: orderItems.items, status, changeNote: finalNote }),
     });
     const data = await response.json();
     if (!response.ok) {
@@ -94,6 +102,9 @@ export function useOrderBuilder({ existingOrder, redirectTo }: UseOrderBuilderAr
     searchResults: search.searchResults,
     searching: search.searching,
     suppliers: search.suppliers,
+    customers: search.customers,
+    customerId,
+    setCustomerId,
     items: orderItems.items,
     deleteTarget: orderItems.deleteTarget,
     setDeleteTarget: orderItems.setDeleteTarget,

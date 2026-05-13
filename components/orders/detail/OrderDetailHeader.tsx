@@ -63,6 +63,7 @@ export function OrderDetailHeader({
 
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
         <MetaItem label="Yaratilgan" value={formatDateTime(order.createdAt)} />
+        <MetaItem label="Mijoz" value={order.customer?.name ?? "—"} />
         <MetaItem label="Oxirgi tahrir" value={formatDateTime(order.updatedAt)} />
         <MetaItem label="Yaratdi" value={order.creator?.name ?? "—"} />
         <MetaItem label="Tahrirladi" value={order.updater?.name ?? "—"} />

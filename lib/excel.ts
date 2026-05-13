@@ -20,6 +20,7 @@ type OrderMeta = {
   version: number;
   createdAt: Date;
   updatedAt: Date;
+  customerName?: string;
   creatorName?: string;
   updaterName?: string;
 };
@@ -39,6 +40,7 @@ export function generateInternalExcel(
     ["Buyurtma raqami:", order.currentOrderNumber],
     ["Versiya:", `V${order.version}`],
     ["Buyurtma sanasi:", order.createdAt.toLocaleDateString("uz")],
+    ["Mijoz:", order.customerName ?? ""],
     ["Oxirgi yangilanish:", order.updatedAt.toLocaleDateString("uz")],
     ["Yaratdi:", order.creatorName ?? ""],
     ["Tahrirladi:", order.updaterName ?? ""],

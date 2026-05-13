@@ -23,6 +23,7 @@ export async function GET(
       items: { orderBy: { partCode: "asc" } },
       creator: { select: { name: true } },
       updater: { select: { name: true } },
+      customer: { select: { name: true } },
       revisions: {
         orderBy: { version: "desc" },
         include: { changer: { select: { name: true } } },
@@ -66,9 +67,16 @@ export async function PUT(
 
   const { id } = await params;
   const body = await req.json();
-  const { items, status, changeNote } = body;
+  const { customerId, items, status, changeNote } = body;
+  if (!customerId) {
+    return Response.json({ error: "Mijoz tanlash majburiy" }, { status: 400 });
+  }
   if (status != null && !isEditableOrderStatus(status)) {
     return Response.json({ error: "Buyurtma holati noto'g'ri" }, { status: 400 });
+  }
+  const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+  if (!customer) {
+    return Response.json({ error: "Mijoz topilmadi" }, { status: 400 });
   }
 
   const existing = await prisma.order.findUnique({
@@ -98,6 +106,7 @@ export async function PUT(
       currentOrderNumber: newOrderNumber,
       version: newVersion,
       status: status ?? "updated",
+      customerId,
       updatedBy: user.id,
       items: {
         create: (items ?? []).map((item: {
@@ -131,7 +140,7 @@ export async function PUT(
         })),
       },
     },
-    include: { items: true, creator: { select: { name: true } } },
+    include: { items: true, creator: { select: { name: true } }, customer: { select: { name: true } } },
   });
 
   await prisma.orderRevision.create({

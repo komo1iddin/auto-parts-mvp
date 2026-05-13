@@ -2,28 +2,48 @@
 
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import type { Customer } from "@/components/orders/types/orderBuilderTypes";
 import { ORDER_EDIT_STATUS_OPTIONS } from "@/lib/utils";
 
 interface OrderBuilderOptionsProps {
+  customers: Customer[];
+  customerId: string;
   status: string;
   changeNote: string;
   changelogPreview: string;
   isEdit: boolean;
+  onCustomerChange: (customerId: string) => void;
   onStatusChange: (status: string) => void;
   onChangeNoteChange: (note: string) => void;
 }
 
 export function OrderBuilderOptions({
+  customers,
+  customerId,
   status,
   changeNote,
   changelogPreview,
   isEdit,
+  onCustomerChange,
   onStatusChange,
   onChangeNoteChange,
 }: OrderBuilderOptionsProps) {
   return (
     <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5">
-      <div className="w-full max-w-xs">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Select
+          label="Mijoz *"
+          value={customerId}
+          onChange={(event) => onCustomerChange(event.target.value)}
+          className={!customerId ? "text-gray-400" : undefined}
+        >
+          <option value="">Mijoz tanlang</option>
+          {customers.map((customer) => (
+            <option key={customer.id} value={customer.id}>
+              {customer.name}
+            </option>
+          ))}
+        </Select>
         <Select
           label="Holat"
           value={status}

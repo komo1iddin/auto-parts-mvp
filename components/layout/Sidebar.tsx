@@ -13,6 +13,7 @@ import {
   Gauge,
   LogOut,
   PackageSearch,
+  UserRound,
   Users,
   Warehouse,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const adminNav: NavItem[] = [
   { href: "/admin/parts", label: "Qismlar", icon: PackageSearch },
   { href: "/admin/categories", label: "Kategoriyalar", icon: FolderTree },
   { href: "/admin/suppliers", label: "Ta'minotchilar", icon: Warehouse },
+  { href: "/admin/customers", label: "Mijozlar", icon: UserRound },
   { href: "/admin/orders", label: "Buyurtmalar", icon: ClipboardList },
   { href: "/admin/users", label: "Foydalanuvchilar", icon: Users },
 ];
@@ -35,6 +37,7 @@ const adminNav: NavItem[] = [
 const managerNav: NavItem[] = [
   { href: "/manager", label: "Dashboard", icon: Gauge },
   { href: "/manager/parts", label: "Qismlar", icon: PackageSearch },
+  { href: "/manager/customers", label: "Mijozlar", icon: UserRound },
   { href: "/manager/orders", label: "Buyurtmalar", icon: ClipboardList },
 ];
 

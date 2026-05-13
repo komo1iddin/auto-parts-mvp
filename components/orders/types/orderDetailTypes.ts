@@ -36,6 +36,7 @@ export interface OrderDetail {
   status: string;
   createdAt: Date | string;
   updatedAt: Date | string;
+  customer?: { name: string } | null;
   creator?: { name: string } | null;
   updater?: { name: string } | null;
   items: DetailItem[];

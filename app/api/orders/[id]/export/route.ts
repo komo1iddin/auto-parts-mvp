@@ -40,6 +40,7 @@ export async function POST(
     where: { id },
     include: {
       items: { orderBy: { partCode: "asc" } },
+      customer: { select: { name: true } },
       creator: { select: { name: true } },
       updater: { select: { name: true } },
     },
@@ -58,6 +59,7 @@ export async function POST(
         version: order.version,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
+        customerName: order.customer?.name,
         creatorName: order.creator?.name,
         updaterName: order.updater?.name,
       },

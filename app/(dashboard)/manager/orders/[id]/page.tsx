@@ -20,6 +20,7 @@ export default async function ManagerOrderDetailPage({
         items: { orderBy: { partCode: "asc" } },
         creator: { select: { name: true } },
         updater: { select: { name: true } },
+        customer: { select: { name: true } },
         revisions: {
           orderBy: { version: "desc" },
           include: { changer: { select: { name: true } } },

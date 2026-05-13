@@ -1,18 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { PartSearchResult, Supplier } from "@/components/orders/types/orderBuilderTypes";
+import type { Customer, PartSearchResult, Supplier } from "@/components/orders/types/orderBuilderTypes";
 
 export function usePartSearch() {
   const [q, setQ] = useState("");
   const [searchResults, setSearchResults] = useState<PartSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
   useEffect(() => {
     fetch("/api/suppliers")
       .then((response) => response.json())
       .then((data) => setSuppliers(data.suppliers ?? []));
+    fetch("/api/customers")
+      .then((response) => response.json())
+      .then((data) => setCustomers(data.customers ?? []));
   }, []);
 
   const search = useCallback(async (query: string) => {
@@ -40,5 +44,6 @@ export function usePartSearch() {
     setSearchResults,
     searching,
     suppliers,
+    customers,
   };
 }

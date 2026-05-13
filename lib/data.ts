@@ -16,6 +16,7 @@ export const DATA_TAGS = {
   parts: "parts",
   categories: "categories",
   suppliers: "suppliers",
+  customers: "customers",
   users: "users",
 } as const;
 
@@ -161,6 +162,7 @@ export const getAdminDashboardData = unstable_cache(
           take: 5,
           include: {
             creator: { select: { name: true } },
+            customer: { select: { name: true } },
             _count: { select: { items: true } },
             items: {
               select: {
@@ -196,6 +198,7 @@ export const getAdminDashboardData = unstable_cache(
     tags: [
       DATA_TAGS.dashboard,
       DATA_TAGS.orders,
+      DATA_TAGS.customers,
       DATA_TAGS.parts,
       DATA_TAGS.suppliers,
       DATA_TAGS.users,
@@ -236,6 +239,7 @@ export const getManagerDashboardData = unstable_cache(
         take: 5,
         include: {
           _count: { select: { items: true } },
+          customer: { select: { name: true } },
           items: {
             select: {
               supplierId: true,
@@ -265,7 +269,7 @@ export const getManagerDashboardData = unstable_cache(
   },
   ["manager-dashboard"],
   {
-    tags: [DATA_TAGS.dashboard, DATA_TAGS.orders],
+    tags: [DATA_TAGS.dashboard, DATA_TAGS.orders, DATA_TAGS.customers],
     revalidate: 15,
   }
 );
@@ -288,6 +292,7 @@ export const getOrdersList = unstable_cache(
         include: {
           creator: { select: { name: true } },
           updater: { select: { name: true } },
+          customer: { select: { name: true } },
           _count: { select: { items: true } },
           items: {
             select: {
@@ -326,7 +331,7 @@ export const getOrdersList = unstable_cache(
   },
   ["orders-list"],
   {
-    tags: [DATA_TAGS.orders],
+    tags: [DATA_TAGS.orders, DATA_TAGS.customers],
     revalidate: 10,
   }
 );
@@ -421,6 +426,17 @@ export const getSuppliersList = unstable_cache(
   ["suppliers-list"],
   {
     tags: [DATA_TAGS.suppliers],
+    revalidate: 15,
+  }
+);
+
+export const getCustomersList = unstable_cache(
+  async () => {
+    return prisma.customer.findMany({ orderBy: { name: "asc" } });
+  },
+  ["customers-list"],
+  {
+    tags: [DATA_TAGS.customers],
     revalidate: 15,
   }
 );

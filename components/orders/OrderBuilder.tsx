@@ -14,6 +14,7 @@ interface OrderBuilderProps {
     id: string;
     items: OrderItem[];
     status: string;
+    customerId?: string | null;
   };
   redirectTo: string;
   ordersPath?: string;
@@ -44,10 +45,13 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = 
       />
 
       <OrderBuilderOptions
+        customers={builder.customers}
+        customerId={builder.customerId}
         status={builder.status}
         changeNote={builder.changeNote}
         changelogPreview={builder.changelogPreview}
         isEdit={Boolean(existingOrder)}
+        onCustomerChange={builder.setCustomerId}
         onStatusChange={builder.setStatus}
         onChangeNoteChange={builder.setChangeNote}
       />

@@ -3,6 +3,11 @@ export interface Supplier {
   name: string;
 }
 
+export interface Customer {
+  id: string;
+  name: string;
+}
+
 export interface PartSearchResult {
   id: string;
   code: string;

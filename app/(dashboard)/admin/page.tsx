@@ -172,6 +172,7 @@ export default async function AdminDashboard() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">Raqam</th>
+                <th className="px-5 py-3 text-left font-medium text-muted-foreground">Mijoz</th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">Yaratdi</th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">Holat</th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">Qismlar</th>
@@ -189,6 +190,7 @@ export default async function AdminDashboard() {
                       {order.currentOrderNumber}
                     </Link>
                   </td>
+                  <td className="px-5 py-3 font-medium text-muted-foreground">{order.customer?.name ?? "—"}</td>
                   <td className="px-5 py-3 text-muted-foreground">{order.creator?.name ?? "—"}</td>
                   <td className="px-5 py-3">
                     <div className="flex flex-col gap-1">
@@ -209,7 +211,7 @@ export default async function AdminDashboard() {
               ))}
               {!recentOrders.length && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="px-5 py-8 text-center text-muted-foreground">
                     Buyurtmalar yo'q
                   </td>
                 </tr>

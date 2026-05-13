@@ -4,6 +4,7 @@ export interface OrderListItem {
   version: number;
   status: string;
   createdAt: string;
+  customer?: { name: string } | null;
   creator?: { name: string } | null;
   _count: { items: number };
   totalQty?: number;

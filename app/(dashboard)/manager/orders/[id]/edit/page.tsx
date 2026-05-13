@@ -31,6 +31,7 @@ export default async function ManagerEditOrderPage({
         existingOrder={{
           id: order.id,
           status: order.status,
+          customerId: order.customerId,
           items: order.items.map((i) => ({
             partId: i.partId ?? i.id,
             partCode: i.partCode,

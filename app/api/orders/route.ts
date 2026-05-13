@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
         include: {
           creator: { select: { name: true } },
           updater: { select: { name: true } },
+          customer: { select: { name: true } },
           _count: { select: { items: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -53,12 +54,19 @@ export async function POST(req: NextRequest) {
     return unauthorized();
   }
 
-  const { items, status = "draft" } = await req.json();
+  const { customerId, items, status = "draft" } = await req.json();
+  if (!customerId) {
+    return Response.json({ error: "Mijoz tanlash majburiy" }, { status: 400 });
+  }
   if (!items?.length) {
     return Response.json({ error: "Kamida bitta qism kerak" }, { status: 400 });
   }
   if (!isEditableOrderStatus(status)) {
     return Response.json({ error: "Buyurtma holati noto'g'ri" }, { status: 400 });
+  }
+  const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+  if (!customer) {
+    return Response.json({ error: "Mijoz topilmadi" }, { status: 400 });
   }
 
   const today = new Date();
@@ -79,6 +87,7 @@ export async function POST(req: NextRequest) {
       currentOrderNumber: orderNumber,
       version: 1,
       status,
+      customerId,
       createdBy: user.id,
       updatedBy: user.id,
       items: {
@@ -113,7 +122,7 @@ export async function POST(req: NextRequest) {
         })),
       },
     },
-    include: { items: true, creator: { select: { name: true } } },
+    include: { items: true, creator: { select: { name: true } }, customer: { select: { name: true } } },
   });
 
   // Log first revision

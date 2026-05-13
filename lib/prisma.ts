@@ -18,6 +18,7 @@ const tableByModel = {
   user: "users",
   category: "categories",
   supplier: "suppliers",
+  customer: "customers",
   part: "parts",
   order: "orders",
   orderItem: "order_items",
@@ -39,6 +40,7 @@ const columnByField: Record<string, string> = {
   sellingPriceCny: "selling_price_cny",
   baseOrderNumber: "base_order_number",
   currentOrderNumber: "current_order_number",
+  customerId: "customer_id",
   createdBy: "created_by",
   updatedBy: "updated_by",
   orderId: "order_id",
@@ -245,8 +247,9 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
 
   if (model === "order") {
     const userIds = unique(rows.flatMap((row) => [row.createdBy, row.updatedBy]));
-    const [users, items, clientPayments, supplierPayments] = await Promise.all([
+    const [users, customers, items, clientPayments, supplierPayments] = await Promise.all([
       include.creator || include.updater ? selectByIds("user", userIds) : Promise.resolve(new Map()),
+      include.customer ? selectByIds("customer", rows.map((row) => row.customerId)) : Promise.resolve(new Map()),
       include._count?.select?.items || include.items
         ? selectWhereIn("orderItem", "orderId", rows.map((row) => row.id))
         : Promise.resolve([]),
@@ -283,6 +286,15 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
           : {}),
         ...(include.updater
           ? { updater: row.updatedBy ? pick(users.get(row.updatedBy), include.updater.select) : null }
+          : {}),
+        ...(include.customer
+          ? {
+              customer: row.customerId
+                ? include.customer.select
+                  ? pick(customers.get(row.customerId), include.customer.select)
+                  : customers.get(row.customerId) ?? null
+                : null,
+            }
           : {}),
         ...(include.items ? { items: orderItems.sort(compareBy(include.items.orderBy)) } : {}),
         ...(include.clientPayments
@@ -367,6 +379,10 @@ async function applyIncludes(model: keyof typeof tableByModel, row: AnyRecord | 
   if (model === "order") {
     const next = { ...row };
     const users = async (id: string | null) => (id ? prisma.user.findUnique({ where: { id } }) : null);
+    if (include.customer) {
+      const customer = row.customerId ? await prisma.customer.findUnique({ where: { id: row.customerId } }) : null;
+      next.customer = customer && include.customer.select ? pick(customer, include.customer.select) : customer;
+    }
     if (include.items) {
       next.items = (await selectAll("orderItem"))
         .filter((item) => item.orderId === row.id)
@@ -572,6 +588,7 @@ export const prisma: any = {
   user: modelApi("user"),
   category: modelApi("category"),
   supplier: modelApi("supplier"),
+  customer: modelApi("customer"),
   part: modelApi("part"),
   order: modelApi("order"),
   orderItem: modelApi("orderItem"),
