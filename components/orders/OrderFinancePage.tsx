@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { AlertDialog } from "@/components/ui/AlertDialog";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import {
@@ -48,7 +49,7 @@ interface OrderFinancePageProps {
 }
 
 type PaymentKind = "client" | "supplier";
-type TabKey = "summary" | "suppliers" | "client" | "supplier";
+type TabKey = "suppliers" | "client" | "supplier";
 
 interface PaymentForm {
   id?: string;
@@ -75,21 +76,10 @@ const FINANCE_STATUS_LABELS: Record<OrderFinanceStatus, string> = {
   closed: "Yopilgan",
 };
 
-function statusBadgeClass(status: PaymentStatus | OrderFinanceStatus) {
-  if (status === "paid" || status === "closed" || status === "supplier_paid") {
-    return "bg-green-100 text-green-700";
-  }
-  if (status === "overpaid" || status === "ready_to_pay_supplier") {
-    return "bg-green-50 text-green-600";
-  }
-  if (
-    status === "partially_paid" ||
-    status === "client_partially_paid" ||
-    status === "supplier_partially_paid"
-  ) {
-    return "bg-yellow-100 text-yellow-700";
-  }
-  return "bg-gray-100 text-gray-600";
+function statusTextClass(status: PaymentStatus | OrderFinanceStatus) {
+  if (status === "paid" || status === "closed" || status === "supplier_paid") return "text-green-600";
+  if (status === "unpaid" || status === "waiting_client_payment") return "text-red-600";
+  return "text-gray-900";
 }
 
 function toDateInput(value: Date | string) {
@@ -100,39 +90,49 @@ function formatDate(value: Date | string) {
   return new Date(value).toLocaleDateString("uz");
 }
 
-function FinanceCard({
+function valueTone(value: number, positiveIsGood = true) {
+  if (value === 0) return "text-gray-900";
+  if (positiveIsGood) return value > 0 ? "text-green-600" : "text-red-600";
+  return value > 0 ? "text-red-600" : "text-green-600";
+}
+
+function FinanceBlock({
   label,
-  badge,
+  status,
   total,
   items,
+  featured = false,
 }: {
   label: string;
-  badge?: React.ReactNode;
+  status?: string;
   total: number;
-  items: { label: string; value: number; tone?: "red" | "green" | "muted" }[];
+  items: { label: string; value: number; className?: string }[];
+  featured?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+    <div className={cn("border border-gray-200 bg-white px-4 py-3", featured && "border-green-200 bg-green-50/50")}>
+      <div className="mb-1 flex items-center gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
           {label}
         </span>
-        {badge}
+        {status && (
+          <>
+            <span className="text-[11px] font-semibold text-gray-300">·</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{status}</span>
+          </>
+        )}
       </div>
-      <div className="mb-4 text-3xl font-bold tracking-tight text-gray-900">
+      <div className={cn("text-2xl font-semibold leading-7 tracking-tight text-gray-950", featured && valueTone(total))}>
         {formatCny(total)}
       </div>
-      <div className="space-y-2 border-t border-gray-100 pt-3">
+      <div className="mt-2 space-y-1">
         {items.map((item) => (
-          <div key={item.label} className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">{item.label}</span>
+          <div key={item.label} className="flex items-center justify-between gap-3 text-[13px] leading-5">
+            <span className="text-gray-500">{item.label}</span>
             <span
               className={cn(
-                "text-sm font-semibold",
-                item.tone === "red" && "text-red-600",
-                item.tone === "green" && "text-green-600",
-                item.tone === "muted" && "text-gray-500",
-                !item.tone && "text-gray-700"
+                "font-semibold text-gray-900",
+                item.className
               )}
             >
               {formatCny(item.value)}
@@ -157,7 +157,7 @@ export function OrderFinancePage({
 }: OrderFinancePageProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [tab, setTab] = useState<TabKey>("summary");
+  const [tab, setTab] = useState<TabKey>(isAdmin ? "suppliers" : "client");
   const [modalKind, setModalKind] = useState<PaymentKind | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     kind: PaymentKind;
@@ -172,20 +172,20 @@ export function OrderFinancePage({
   });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const canCreateClient = isAdmin || canManageClientPayments;
 
   const tabs: { key: TabKey; label: string }[] = [
-    { key: "summary", label: "Xulosa" },
     ...(isAdmin ? [{ key: "suppliers" as TabKey, label: "Ta'minotchilar" }] : []),
     { key: "client", label: "Mijoz to'lovlari" },
     ...(isAdmin ? [{ key: "supplier" as TabKey, label: "Ta'minotchi to'lovlari" }] : []),
   ];
 
-  function openCreate(kind: PaymentKind) {
+  function openCreate(kind: PaymentKind, supplierId?: string | null) {
     setModalKind(kind);
     setForm({
-      supplierId: suppliers[0]?.id ?? "",
+      supplierId: supplierId ?? suppliers[0]?.id ?? "",
       amountCny: "",
       paymentDate: new Date().toISOString().slice(0, 10),
       paymentMethod: "cash",
@@ -226,7 +226,9 @@ export function OrderFinancePage({
     const data = await res.json().catch(() => ({}));
     setSaving(false);
     if (!res.ok) {
-      alert(data.error ?? "To'lovni saqlashda xatolik");
+      setErrorMessage(
+        data.error ?? `To'lovni saqlashda xatolik. Server status: ${res.status}`
+      );
       return;
     }
     setModalKind(null);
@@ -243,7 +245,9 @@ export function OrderFinancePage({
     setDeleting(false);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      alert(data.error ?? "To'lovni o'chirishda xatolik");
+      setErrorMessage(
+        data.error ?? `To'lovni o'chirishda xatolik. Server status: ${res.status}`
+      );
       return;
     }
     setDeleteTarget(null);
@@ -263,27 +267,21 @@ export function OrderFinancePage({
             Orqaga
           </Link>
           <span className="text-gray-200">/</span>
-          <span className="text-sm font-semibold text-gray-900">Order Finance</span>
-          <span className="text-sm text-gray-400">{orderNumber}</span>
-          <div className="ml-auto flex items-center gap-2">
-            <span
-              className={cn(
-                "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                statusBadgeClass(summary.clientPaymentStatus)
-              )}
-            >
+          <span className="text-sm font-semibold text-gray-900">{orderNumber}</span>
+          <div className="min-w-0 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            <span className={statusTextClass(summary.clientPaymentStatus)}>
               {CLIENT_STATUS_LABELS[summary.clientPaymentStatus]}
             </span>
             {isAdmin && (
-              <span
-                className={cn(
-                  "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                  statusBadgeClass(summary.orderFinanceStatus)
-                )}
-              >
-                {FINANCE_STATUS_LABELS[summary.orderFinanceStatus]}
-              </span>
+              <>
+                <span className="px-1.5 text-gray-300">•</span>
+                <span className={statusTextClass(summary.orderFinanceStatus)}>
+                  {FINANCE_STATUS_LABELS[summary.orderFinanceStatus]}
+                </span>
+              </>
             )}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
             {isPending && (
               <span className="text-xs text-gray-400">Yangilanmoqda...</span>
             )}
@@ -292,56 +290,47 @@ export function OrderFinancePage({
       </div>
 
       {/* Page body */}
-      <div className="space-y-5 p-6">
-        {/* Financial summary cards */}
-        <div className={cn("grid gap-4", isAdmin ? "sm:grid-cols-3" : "sm:grid-cols-1 max-w-sm")}>
-          <FinanceCard
+      <div className="mx-auto w-full max-w-6xl space-y-3 p-6">
+        <div className={cn("grid gap-3", isAdmin ? "lg:grid-cols-3" : "max-w-md")}>
+          <FinanceBlock
             label="Mijoz"
-            badge={
-              <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-xs font-medium",
-                  statusBadgeClass(summary.clientPaymentStatus)
-                )}
-              >
-                {CLIENT_STATUS_LABELS[summary.clientPaymentStatus]}
-              </span>
-            }
+            status={CLIENT_STATUS_LABELS[summary.clientPaymentStatus]}
             total={summary.clientTotal}
             items={[
-              { label: "To'landi", value: summary.clientPaid, tone: summary.clientPaid > 0 ? "green" : "muted" },
+              { label: "Paid", value: summary.clientPaid, className: summary.clientPaid > 0 ? "text-green-600" : "text-gray-900" },
               {
-                label: "Qoldiq",
+                label: "Balance",
                 value: summary.clientBalance,
-                tone: summary.clientBalance > 0 ? "red" : "green",
+                className: valueTone(summary.clientBalance, false),
               },
             ]}
           />
 
           {isAdmin && (
-            <FinanceCard
-              label="Ta'minotchi"
+            <FinanceBlock
+              label="Suppliers"
               total={summary.supplierTotal}
               items={[
-                { label: "To'landi", value: summary.supplierPaid, tone: summary.supplierPaid > 0 ? "green" : "muted" },
+                { label: "Paid", value: summary.supplierPaid, className: summary.supplierPaid > 0 ? "text-green-600" : "text-gray-900" },
                 {
-                  label: "Qoldiq",
+                  label: "Balance",
                   value: summary.supplierBalance,
-                  tone: summary.supplierBalance > 0 ? "red" : "green",
+                  className: valueTone(summary.supplierBalance, false),
                 },
               ]}
             />
           )}
 
           {isAdmin && (
-            <FinanceCard
-              label="Foyda"
+            <FinanceBlock
+              label="Profit"
               total={summary.expectedGrossProfit}
+              featured
               items={[
                 {
-                  label: "Naqd farqi",
+                  label: "Cash Difference",
                   value: summary.cashDifference,
-                  tone: summary.cashDifference >= 0 ? "green" : "red",
+                  className: valueTone(summary.cashDifference),
                 },
               ]}
             />
@@ -349,7 +338,7 @@ export function OrderFinancePage({
         </div>
 
         {/* Pill tabs */}
-        <div className="inline-flex rounded-lg bg-gray-100 p-1 gap-0.5">
+        <div className="inline-flex rounded-full bg-gray-100 p-1 gap-0.5">
           {tabs.map((t) => (
             <button
               key={t.key}
@@ -358,7 +347,7 @@ export function OrderFinancePage({
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 tab === t.key
-                  ? "bg-white text-gray-900 shadow-sm"
+                  ? "rounded-full bg-gray-950 text-white shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
               )}
             >
@@ -368,62 +357,30 @@ export function OrderFinancePage({
         </div>
 
         {/* Tab content */}
-        {tab === "summary" && (
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
-            <div className="flex items-center justify-between px-5 py-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Mijoz holati
-              </span>
-              <span
-                className={cn(
-                  "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                  statusBadgeClass(summary.clientPaymentStatus)
-                )}
-              >
-                {CLIENT_STATUS_LABELS[summary.clientPaymentStatus]}
-              </span>
-            </div>
-            {isAdmin && (
-              <div className="flex items-center justify-between px-5 py-3">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  Finance holati
-                </span>
-                <span
-                  className={cn(
-                    "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                    statusBadgeClass(summary.orderFinanceStatus)
-                  )}
-                >
-                  {FINANCE_STATUS_LABELS[summary.orderFinanceStatus]}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-
         {tab === "suppliers" && isAdmin && (
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-            <table className="w-full text-sm">
+          <div className="max-w-5xl overflow-hidden border border-gray-200 bg-white">
+            <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">
+                  <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase text-gray-400">
                     Ta'minotchi
                   </th>
-                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">
+                  <th className="h-9 px-3 text-center text-[11px] font-semibold uppercase text-gray-400">
                     Qismlar
                   </th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">
+                  <th className="h-9 px-3 text-right text-[11px] font-semibold uppercase text-gray-400">
                     Jami
                   </th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">
+                  <th className="h-9 px-3 text-right text-[11px] font-semibold uppercase text-gray-400">
                     To'landi
                   </th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">
+                  <th className="h-9 px-3 text-right text-[11px] font-semibold uppercase text-gray-400">
                     Qoldiq
                   </th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">
+                  <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase text-gray-400">
                     Holat
                   </th>
+                  <th className="h-9 px-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -431,52 +388,44 @@ export function OrderFinancePage({
                   const paid = row.supplierBalance <= 0;
                   return (
                     <tr key={row.supplierId ?? "no-supplier"} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-2 font-medium text-gray-800">{row.supplierName}</td>
-                      <td className="px-4 py-2 text-center text-gray-500">{row.itemCount}</td>
-                      <td className="px-4 py-2 text-right font-medium text-gray-800">
+                      <td className="h-10 px-3 font-medium text-gray-900">{row.supplierName}</td>
+                      <td className="h-10 px-3 text-center text-gray-500">{row.itemCount}</td>
+                      <td className="h-10 px-3 text-right font-medium text-gray-800">
                         {formatCny(row.supplierTotal)}
                       </td>
-                      <td className="px-4 py-2 text-right text-gray-600">
+                      <td className="h-10 px-3 text-right font-semibold text-green-600">
                         {formatCny(row.supplierPaid)}
                       </td>
                       <td
                         className={cn(
-                          "px-4 py-2 text-right font-semibold",
+                          "h-10 px-3 text-right font-semibold",
                           row.supplierBalance > 0 ? "text-red-600" : "text-green-600"
                         )}
                       >
                         {formatCny(row.supplierBalance)}
                       </td>
-                      <td className="px-4 py-2 text-right">
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-xs font-medium",
-                            paid ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
-                          )}
-                        >
-                          {paid ? "To'langan" : "To'lanmagan"}
-                        </span>
+                      <td className={cn("h-10 px-3 text-left font-medium", paid ? "text-green-600" : "text-red-600")}>
+                        {paid ? "Paid" : "Unpaid"}
+                      </td>
+                      <td className="h-10 px-3 text-right">
+                        {row.supplierId && (
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => openCreate("supplier", row.supplierId)}>
+                            Pay Supplier
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   );
                 })}
                 {summary.supplierBreakdown.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
-                      Ta'minotchi yo'q
+                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                      Buyurtma itemlarida ta'minotchi biriktirilmagan
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-            {summary.supplierBreakdown.some((r) => r.supplierBalance > 0) && (
-              <div className="border-t border-gray-100 px-4 py-3 flex justify-end">
-                <Button size="sm" onClick={() => openCreate("supplier")}>
-                  <Plus className="size-4" />
-                  Ta'minotchiga to'lov
-                </Button>
-              </div>
-            )}
           </div>
         )}
 
@@ -496,7 +445,7 @@ export function OrderFinancePage({
           <PaymentTable
             kind="supplier"
             payments={supplierPayments}
-            canCreate={isAdmin}
+            canCreate={isAdmin && suppliers.length > 0}
             canEdit={isAdmin}
             onCreate={() => openCreate("supplier")}
             onEdit={(payment) => openEdit("supplier", payment)}
@@ -506,7 +455,7 @@ export function OrderFinancePage({
       </div>
 
       {/* Payment form modal */}
-      <Modal
+          <Modal
         open={modalKind != null}
         onClose={() => setModalKind(null)}
         title={form.id ? "To'lovni tahrirlash" : "Yangi to'lov"}
@@ -516,15 +465,20 @@ export function OrderFinancePage({
             <Select
               label="Ta'minotchi"
               value={form.supplierId}
+              disabled={!suppliers.length}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, supplierId: e.target.value }))
               }
             >
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
+              {suppliers.length ? (
+                suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))
+              ) : (
+                <option value="">Buyurtmada ta'minotchi yo'q</option>
+              )}
             </Select>
           )}
           <Input
@@ -571,7 +525,12 @@ export function OrderFinancePage({
           <div className="flex gap-3 pt-2">
             <Button
               onClick={savePayment}
-              disabled={saving || !form.amountCny || Number(form.amountCny) <= 0}
+              disabled={
+                saving ||
+                !form.amountCny ||
+                Number(form.amountCny) <= 0 ||
+                (modalKind === "supplier" && !form.supplierId)
+              }
             >
               {saving ? "Saqlanmoqda..." : "Saqlash"}
             </Button>
@@ -583,27 +542,25 @@ export function OrderFinancePage({
       </Modal>
 
       {/* Delete confirmation modal */}
-      <Modal
+      <AlertDialog
         open={deleteTarget != null}
-        onClose={() => setDeleteTarget(null)}
         title="To'lovni o'chirish"
-        className="max-w-sm"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Bu to'lov yozuvini o'chirishni tasdiqlaysizmi? Bu amalni qaytarib bo'lmaydi.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>
-              Bekor
-            </Button>
-            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
-              <Trash2 className="size-4" />
-              {deleting ? "O'chirilmoqda..." : "O'chirish"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        description="Bu to'lov yozuvini o'chirishni tasdiqlaysizmi? Bu amalni qaytarib bo'lmaydi."
+        confirmLabel="O'chirish"
+        cancelLabel="Bekor"
+        destructive
+        loading={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+      />
+
+      <AlertDialog
+        open={Boolean(errorMessage)}
+        title="Xatolik"
+        description={errorMessage}
+        confirmLabel="Tushunarli"
+        onConfirm={() => setErrorMessage("")}
+      />
     </div>
   );
 }
@@ -627,62 +584,63 @@ function PaymentTable({
 }) {
   const colSpan = (kind === "supplier" ? 6 : 5) + (canEdit ? 1 : 0);
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <table className="w-full text-sm">
+    <div className="max-w-4xl overflow-hidden border border-gray-200 bg-white">
+      <table className="w-full text-[13px]">
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
             {kind === "supplier" && (
-              <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">
+              <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase text-gray-400">
                 Ta'minotchi
               </th>
             )}
-            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Sana</th>
-            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Usul</th>
-            <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Miqdor</th>
-            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Izoh</th>
-            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Kiritdi</th>
-            {canEdit && <th className="px-4 py-2" />}
+            <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase text-gray-400">Sana</th>
+            <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase text-gray-400">Usul</th>
+            <th className="h-9 px-3 text-right text-[11px] font-semibold uppercase text-gray-400">Miqdor</th>
+            <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase text-gray-400">Izoh</th>
+            <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase text-gray-400">Kiritdi</th>
+            {canEdit && <th className="h-9 px-3" />}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
           {payments.map((payment) => (
             <tr key={payment.id} className="hover:bg-gray-50/50">
               {kind === "supplier" && (
-                <td className="px-4 py-2 font-medium text-gray-800">
+                <td className="h-10 px-3 font-medium text-gray-900">
                   {payment.supplier?.name ?? "—"}
                 </td>
               )}
-              <td className="px-4 py-2 text-gray-600">{formatDate(payment.paymentDate)}</td>
-              <td className="px-4 py-2 text-gray-600">
+              <td className="h-10 px-3 text-gray-600">{formatDate(payment.paymentDate)}</td>
+              <td className="h-10 px-3 text-gray-600">
                 {PAYMENT_METHOD_LABELS[payment.paymentMethod as PaymentMethod] ??
                   payment.paymentMethod}
               </td>
-              <td className="px-4 py-2 text-right font-semibold text-gray-900">
+              <td className="h-10 px-3 text-right font-semibold text-green-600">
                 {formatCny(String(payment.amountCny))}
               </td>
-              <td className="max-w-[160px] truncate px-4 py-2 text-gray-500">
+              <td className="h-10 max-w-[140px] truncate px-3 text-gray-500">
                 {payment.note ?? "—"}
               </td>
-              <td className="px-4 py-2 text-gray-500">{payment.creator?.name ?? "—"}</td>
+              <td className="h-10 px-3 text-gray-500">{payment.creator?.name ?? "—"}</td>
               {canEdit && (
-                <td className="px-4 py-2">
+                <td className="h-10 px-3">
                   <div className="flex justify-end gap-1">
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="h-7 px-2"
                       aria-label="Tahrirlash"
                       onClick={() => onEdit(payment)}
                     >
-                      <Pencil className="size-4" />
+                      <Pencil className="size-3.5" />
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-red-600 hover:bg-red-50"
+                      className="h-7 px-2 text-red-600 hover:bg-gray-100"
                       aria-label="O'chirish"
                       onClick={() => onDelete(payment)}
                     >
-                      <Trash2 className="size-4" />
+                      <Trash2 className="size-3.5" />
                     </Button>
                   </div>
                 </td>
@@ -691,19 +649,15 @@ function PaymentTable({
           ))}
           {payments.length === 0 && (
             <tr>
-              <td colSpan={colSpan} className="px-4 py-10 text-center">
-                <div className="text-sm text-gray-400">
-                  {kind === "client" ? "Mijoz to'lovlari yo'q" : "Ta'minotchi to'lovlari yo'q"}
+              <td colSpan={colSpan} className="px-4 py-8 text-center">
+                <div className="text-[13px] text-gray-500">
+                  No {kind === "client" ? "client" : "supplier"} payments yet
                 </div>
                 {canCreate && (
-                  <button
-                    type="button"
-                    onClick={onCreate}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:border-gray-300 hover:text-gray-900"
-                  >
-                    <Plus className="size-3.5" />
-                    To'lov qo'shish
-                  </button>
+                  <Button type="button" size="sm" className="mt-3 h-8" onClick={onCreate}>
+                    <Plus className="size-4" />
+                    Add First Payment
+                  </Button>
                 )}
               </td>
             </tr>
@@ -711,10 +665,10 @@ function PaymentTable({
         </tbody>
       </table>
       {payments.length > 0 && canCreate && (
-        <div className="border-t border-gray-100 px-4 py-3 flex justify-end">
-          <Button size="sm" onClick={onCreate}>
+        <div className="border-t border-gray-100 px-3 py-2 flex justify-end">
+          <Button size="sm" className="h-8" onClick={onCreate}>
             <Plus className="size-4" />
-            To'lov qo'shish
+            Add Payment
           </Button>
         </div>
       )}

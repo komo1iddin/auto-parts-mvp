@@ -41,6 +41,12 @@ export default async function AdminOrderFinancePage({
   const clientPayments = order.clientPayments ?? [];
   const supplierPayments = order.supplierPayments ?? [];
   const finance = calculateOrderFinance(order.items ?? [], clientPayments, supplierPayments);
+  const orderSupplierIds = new Set(
+    finance.supplierBreakdown
+      .map((supplier) => supplier.supplierId)
+      .filter(Boolean)
+  );
+  const orderSuppliers = allSuppliers.filter((supplier) => orderSupplierIds.has(supplier.id));
 
   return (
     <OrderFinancePage
@@ -62,7 +68,7 @@ export default async function AdminOrderFinancePage({
         paymentDate: p.paymentDate.toISOString(),
         createdAt: p.createdAt.toISOString(),
       }))}
-      suppliers={allSuppliers}
+      suppliers={orderSuppliers}
     />
   );
 }
