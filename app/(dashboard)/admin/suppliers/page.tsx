@@ -1,8 +1,5 @@
-import { SuppliersList } from "@/components/suppliers/SuppliersList";
-import { getSuppliersList } from "@/lib/data";
+import { redirect } from "next/navigation";
 
-export default async function SuppliersPage() {
-  const suppliers = await getSuppliersList();
-
-  return <SuppliersList suppliers={suppliers} />;
+export default function SuppliersPage() {
+  redirect("/admin/settings");
 }

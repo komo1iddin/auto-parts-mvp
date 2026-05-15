@@ -10,7 +10,6 @@ import { useRouter } from "next/navigation";
 import {
   Boxes,
   ClipboardList,
-  FolderTree,
   Gauge,
   LogOut,
   PackageSearch,
@@ -18,8 +17,6 @@ import {
   PanelLeftOpen,
   Settings,
   UserRound,
-  Users,
-  Warehouse,
 } from "lucide-react";
 
 interface NavItem {
@@ -31,11 +28,7 @@ interface NavItem {
 const adminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: Gauge },
   { href: "/admin/parts", label: "Qismlar", icon: PackageSearch },
-  { href: "/admin/categories", label: "Kategoriyalar", icon: FolderTree },
-  { href: "/admin/suppliers", label: "Ta'minotchilar", icon: Warehouse },
-  { href: "/admin/customers", label: "Mijozlar", icon: UserRound },
   { href: "/admin/orders", label: "Buyurtmalar", icon: ClipboardList },
-  { href: "/admin/users", label: "Foydalanuvchilar", icon: Users },
   { href: "/admin/settings", label: "Sozlamalar", icon: Settings },
 ];
 

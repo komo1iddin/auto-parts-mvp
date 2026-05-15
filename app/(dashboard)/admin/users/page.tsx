@@ -1,8 +1,5 @@
-import { UsersList } from "@/components/users/UsersList";
-import { getUsersList } from "@/lib/data";
+import { redirect } from "next/navigation";
 
-export default async function UsersPage() {
-  const users = await getUsersList();
-
-  return <UsersList users={users} />;
+export default function UsersPage() {
+  redirect("/admin/settings");
 }
