@@ -51,9 +51,10 @@ type PendingResolution = {
 
 interface OrderExcelImportProps {
   onImportItems: (items: OrderItem[]) => void;
+  suppliers?: { id: string; name: string }[];
 }
 
-export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
+export function OrderExcelImport({ onImportItems, suppliers = [] }: OrderExcelImportProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -63,13 +64,34 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
   const [pendingResolution, setPendingResolution] = useState<PendingResolution | null>(null);
   const [resolutionTypes, setResolutionTypes] = useState<Record<string, string>>({});
   const [resolutionPrices, setResolutionPrices] = useState<Record<string, { purchasePriceCny: string; sellingPriceCny: string }>>({});
+  const [resolutionSupplierIds, setResolutionSupplierIds] = useState<Record<string, string>>({});
+  const [bulkSupplierId, setBulkSupplierId] = useState("");
 
-  function completeImport(data: { items?: OrderItem[]; summary?: ImportSummary }) {
-    onImportItems(data.items ?? []);
-    setSummary(data.summary ?? null);
+  function resetResolution() {
     setPendingResolution(null);
     setResolutionTypes({});
     setResolutionPrices({});
+    setResolutionSupplierIds({});
+    setBulkSupplierId("");
+  }
+
+  function completeImport(data: { items?: OrderItem[]; summary?: ImportSummary }, capturedResolution: PendingResolution | null) {
+    let items = data.items ?? [];
+
+    if (Object.keys(resolutionSupplierIds).length > 0 || bulkSupplierId) {
+      items = items.map((item, index) => {
+        const rowKey = capturedResolution?.rows[index]?.rowKey;
+        const perRowId = rowKey ? resolutionSupplierIds[rowKey] : undefined;
+        const supplierId = perRowId || item.supplierId || bulkSupplierId || "";
+        if (!supplierId || supplierId === item.supplierId) return item;
+        const supplier = suppliers.find((s) => s.id === supplierId);
+        return { ...item, supplierId, supplierName: supplier?.name ?? item.supplierName };
+      });
+    }
+
+    onImportItems(items);
+    setSummary(data.summary ?? null);
+    resetResolution();
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -94,6 +116,24 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
           purchasePriceCny: issue.purchasePriceCny == null ? "" : String(issue.purchasePriceCny),
           sellingPriceCny: issue.sellingPriceCny == null ? "" : String(issue.sellingPriceCny),
         };
+      }
+      return next;
+    });
+    setResolutionSupplierIds((current) => {
+      const next: Record<string, string> = {};
+      for (const issue of data.issues) {
+        next[issue.rowKey] = current[issue.rowKey] ?? "";
+      }
+      return next;
+    });
+  }
+
+  function applyBulkSupplier() {
+    if (!bulkSupplierId || !pendingResolution) return;
+    setResolutionSupplierIds(() => {
+      const next: Record<string, string> = {};
+      for (const issue of pendingResolution.issues) {
+        next[issue.rowKey] = bulkSupplierId;
       }
       return next;
     });
@@ -130,7 +170,7 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
       return;
     }
 
-    completeImport(data);
+    completeImport(data, null);
   }
 
   async function confirmResolution() {
@@ -151,6 +191,7 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
     setResolving(true);
     setError("");
 
+    const captured = pendingResolution;
     const response = await fetch("/api/orders/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -171,7 +212,7 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
       return;
     }
 
-    completeImport(data);
+    completeImport(data, captured);
   }
 
   function handleFiles(files: FileList | null) {
@@ -190,6 +231,11 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
       },
     }));
   }
+
+  const supplierOptions = [
+    { value: "", label: "—" },
+    ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+  ];
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -266,7 +312,7 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
       <Modal
         open={Boolean(pendingResolution)}
         onClose={() => {
-          if (!resolving) setPendingResolution(null);
+          if (!resolving) resetResolution();
         }}
         title="Part turini aniqlash"
         className="max-w-6xl"
@@ -277,24 +323,51 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
               Quyidagi part numberlar uchun tur/sifat aniq emas. Catalogga qo'shish yoki orderga bog'lashdan oldin turini belgilang.
             </p>
 
+            {suppliers.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-sm font-medium text-gray-700">Barchasi uchun ta'minotchi:</span>
+                <select
+                  value={bulkSupplierId}
+                  onChange={(event) => setBulkSupplierId(event.target.value)}
+                  disabled={resolving}
+                  className="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50"
+                >
+                  <option value="">Tanlang</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={resolving || !bulkSupplierId}
+                  onClick={applyBulkSupplier}
+                >
+                  Barchasiga belgilash
+                </Button>
+              </div>
+            )}
+
             <div className="max-h-[55vh] overflow-y-auto rounded-lg border border-gray-200">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-gray-50">
                   <tr className="border-b border-gray-200">
                     <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Part number</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Nomi</th>
                     <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600">Miqdor</th>
                     <th className="w-24 px-2 py-2 text-center text-xs font-semibold text-gray-600">Sotib olish</th>
                     <th className="w-24 px-2 py-2 text-center text-xs font-semibold text-gray-600">Sotish</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Holat</th>
-                    <th className="w-44 px-3 py-2 text-left text-xs font-semibold text-gray-600">Turi</th>
+                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600">Katalogda mavjudmi?</th>
+                    <th className="w-40 px-3 py-2 text-center text-xs font-semibold text-gray-600">Turi</th>
+                    {suppliers.length > 0 && (
+                      <th className="w-36 px-3 py-2 text-left text-xs font-semibold text-gray-600">Ta'minotchi</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {pendingResolution.issues.map((issue) => (
                     <tr key={issue.rowKey} className="border-b border-gray-100 last:border-0">
                       <td className="px-3 py-2 font-mono text-xs font-semibold text-gray-800">{issue.partCode}</td>
-                      <td className="max-w-[220px] truncate px-3 py-2 text-gray-600">{issue.partName || "—"}</td>
                       <td className="px-3 py-2 text-center text-gray-700">{issue.quantity}</td>
                       <td className="px-2 py-2">
                         <Input
@@ -318,10 +391,16 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
                           className="mx-auto h-8 w-20 px-2 text-center"
                         />
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-500">
-                        {issue.isNewPart ? "Catalogda yo'q" : `Catalogda bor${issue.existingType ? `: ${issue.existingType}` : ""}`}
+                      <td className="px-3 py-2 text-center text-xs">
+                        {issue.isNewPart ? (
+                          <span className="text-gray-400">Yo'q</span>
+                        ) : (
+                          <span className="text-emerald-700">
+                            Bor{issue.existingType ? ` (${issue.existingType})` : ""}
+                          </span>
+                        )}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 text-center">
                         <Select
                           value={resolutionTypes[issue.rowKey] ?? ""}
                           onChange={(event) => setResolutionTypes((current) => ({
@@ -338,6 +417,22 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
                           ))}
                         </Select>
                       </td>
+                      {suppliers.length > 0 && (
+                        <td className="px-3 py-2">
+                          <Select
+                            value={resolutionSupplierIds[issue.rowKey] ?? ""}
+                            onChange={(event) => setResolutionSupplierIds((current) => ({
+                              ...current,
+                              [issue.rowKey]: event.target.value,
+                            }))}
+                            disabled={resolving}
+                          >
+                            {supplierOptions.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </Select>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -349,7 +444,7 @@ export function OrderExcelImport({ onImportItems }: OrderExcelImportProps) {
                 type="button"
                 variant="secondary"
                 disabled={resolving}
-                onClick={() => setPendingResolution(null)}
+                onClick={resetResolution}
               >
                 Bekor qilish
               </Button>

@@ -26,7 +26,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = 
 
   return (
     <div className="space-y-6">
-      <OrderExcelImport onImportItems={builder.addImportedItems} />
+      <OrderExcelImport onImportItems={builder.addImportedItems} suppliers={builder.suppliers} />
 
       <OrderPartSearch
         query={builder.q}

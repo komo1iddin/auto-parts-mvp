@@ -39,7 +39,7 @@ export function OrdersList({
     <div>
       <OrdersListHeader total={total} isAdmin={isAdmin} basePath={basePath} />
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <OrdersListToolbar
           status={status}
           statusCounts={statusCounts}

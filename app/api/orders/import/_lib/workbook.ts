@@ -5,7 +5,7 @@ import { HEADER_ALIASES, TYPE_ALIASES, type HeaderField } from "./workbook-alias
 
 function headerMatches(header: string, alias: string) {
   const normalizedAlias = normalizeHeader(alias);
-  return header === normalizedAlias || header.includes(normalizedAlias) || normalizedAlias.includes(header);
+  return header === normalizedAlias || header.includes(normalizedAlias) || (header.length >= 3 && normalizedAlias.includes(header));
 }
 
 function normalizeType(value: unknown) {
