@@ -28,6 +28,8 @@ export function OrderItemsTableRow({
   updateQty,
   onDelete,
 }: OrderItemsTableRowProps) {
+  const rowKey = item.id ?? item.partVariantId ?? item.partId ?? item.localId ?? item.partCode;
+
   return (
     <tr className="border-b border-gray-50 hover:bg-gray-50/50">
       <td className="px-4 py-2.5 align-middle whitespace-nowrap">
@@ -52,7 +54,7 @@ export function OrderItemsTableRow({
         <div className="flex justify-center">
           <TableSelect
             value={item.type}
-            onChange={(value) => updateField(item.partId, "type", value)}
+            onChange={(value) => updateField(rowKey, "type", value)}
             options={typeOptions}
             width={112}
           />
@@ -64,7 +66,7 @@ export function OrderItemsTableRow({
           <div className="flex justify-center">
             <TableInput
               value={item.purchasePriceCny ?? ""}
-              onChange={(value) => updateField(item.partId, "purchasePriceCny", value === "" ? null : Number(value))}
+              onChange={(value) => updateField(rowKey, "purchasePriceCny", value === "" ? null : Number(value))}
               width={80}
               placeholder="0"
             />
@@ -76,7 +78,7 @@ export function OrderItemsTableRow({
         <div className="flex justify-center">
           <TableInput
             value={item.sellingPriceCny ?? ""}
-            onChange={(value) => updateField(item.partId, "sellingPriceCny", value === "" ? null : Number(value))}
+            onChange={(value) => updateField(rowKey, "sellingPriceCny", value === "" ? null : Number(value))}
             width={80}
             placeholder="0"
           />
@@ -87,7 +89,7 @@ export function OrderItemsTableRow({
         <div className="flex justify-center">
           <TableInput
             value={item.quantity}
-            onChange={(value) => updateQty(item.partId, value === "" ? 0 : Number(value))}
+            onChange={(value) => updateQty(rowKey, value === "" ? 0 : Number(value))}
             width={64}
             center
             step={1}
@@ -102,8 +104,8 @@ export function OrderItemsTableRow({
               value={item.supplierId}
               onChange={(value) => {
                 const supplier = suppliers.find((entry) => entry.id === value);
-                updateField(item.partId, "supplierId", value);
-                updateField(item.partId, "supplierName", supplier?.name ?? "");
+                updateField(rowKey, "supplierId", value);
+                updateField(rowKey, "supplierName", supplier?.name ?? "");
               }}
               options={supplierOptions}
               width={128}
@@ -117,7 +119,7 @@ export function OrderItemsTableRow({
           <input
             type="text"
             value={item.note}
-            onChange={(event) => updateField(item.partId, "note", event.target.value)}
+            onChange={(event) => updateField(rowKey, "note", event.target.value)}
             placeholder="Izoh..."
             className={cn(
               "flex h-8 rounded-md border border-input bg-background px-2 py-0 text-sm shadow-xs transition-colors outline-none",

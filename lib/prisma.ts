@@ -27,6 +27,7 @@ const tableByModel = {
   clientPayment: "client_payments",
   supplierPayment: "supplier_payments",
   settingOption: "setting_options",
+  partVariant: "part_variants",
 } as const;
 
 const columnByField: Record<string, string> = {
@@ -46,6 +47,7 @@ const columnByField: Record<string, string> = {
   updatedBy: "updated_by",
   orderId: "order_id",
   partId: "part_id",
+  partVariantId: "part_variant_id",
   partCode: "part_code",
   partName: "part_name",
   categoryName: "category_name",
@@ -175,7 +177,87 @@ function applyOrder(query: any, orderBy?: any): any {
   return query;
 }
 
+function applyExactWhere(query: any, where?: AnyRecord): any {
+  if (!where) return query;
+  for (const [field, value] of Object.entries(where)) {
+    if (value !== undefined) query = query.eq(toDbField(field), value);
+  }
+  return query;
+}
+
+function matchesCondition(value: unknown, condition: any): boolean {
+  if (condition && typeof condition === "object" && !Array.isArray(condition)) {
+    if ("contains" in condition) {
+      const source = String(value ?? "");
+      const needle = String(condition.contains ?? "");
+      return condition.mode === "insensitive"
+        ? source.toLowerCase().includes(needle.toLowerCase())
+        : source.includes(needle);
+    }
+    if ("not" in condition) return value !== condition.not;
+    if ("gte" in condition) return new Date(value as string).getTime() >= new Date(condition.gte).getTime();
+    if ("lt" in condition) return new Date(value as string).getTime() < new Date(condition.lt).getTime();
+  }
+
+  return value === condition;
+}
+
+function matchesWhere(row: AnyRecord | null | undefined, where?: AnyRecord): boolean {
+  if (!where || !row) return true;
+
+  for (const [field, value] of Object.entries(where)) {
+    if (value === undefined) continue;
+    if (field === "AND") {
+      if (!(value as AnyRecord[]).every((item) => matchesWhere(row, item))) return false;
+      continue;
+    }
+    if (field === "OR") {
+      if (!(value as AnyRecord[]).some((item) => matchesWhere(row, item))) return false;
+      continue;
+    }
+    if (field === "part") {
+      if (!matchesWhere(row.part, value as AnyRecord)) return false;
+      continue;
+    }
+
+    if (!matchesCondition(row[field], value)) return false;
+  }
+
+  return true;
+}
+
+function hasRelationFilter(where?: AnyRecord): boolean {
+  if (!where) return false;
+  return Object.entries(where).some(([field, value]) => {
+    if (field === "part") return true;
+    if ((field === "AND" || field === "OR") && Array.isArray(value)) {
+      return value.some((item) => hasRelationFilter(item));
+    }
+    return false;
+  });
+}
+
+async function selectPartVariantRows(args: AnyRecord = {}): Promise<AnyRecord[]> {
+  const rows = await selectAll("partVariant");
+  const parts = await selectByIds("part", rows.map((row) => row.partId));
+  const withParts = rows.map((row) => ({ ...row, part: row.partId ? parts.get(row.partId) ?? null : null }));
+  const filtered = withParts.filter((row) => matchesWhere(row, args.where));
+  const sorted = filtered.sort(compareBy(args.orderBy));
+
+  if (typeof args.skip === "number" || typeof args.take === "number") {
+    const from = args.skip ?? 0;
+    const to = typeof args.take === "number" ? from + args.take : undefined;
+    return sorted.slice(from, to);
+  }
+
+  return sorted;
+}
+
 async function selectRows(model: keyof typeof tableByModel, args: AnyRecord = {}): Promise<AnyRecord[]> {
+  if (model === "partVariant" && hasRelationFilter(args.where)) {
+    return selectPartVariantRows(args);
+  }
+
   let query = supabase.from(tableByModel[model]).select("*");
   query = applyWhere(query, args.where);
   query = applyOrder(query, args.orderBy);
@@ -243,6 +325,24 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
     return rows.map((row) => ({
       ...row,
       ...(include.category ? { category: row.categoryId ? categories.get(row.categoryId) ?? null : null } : {}),
+      ...(include.supplier ? { supplier: row.supplierId ? suppliers.get(row.supplierId) ?? null : null } : {}),
+    }));
+  }
+
+  if (model === "partVariant") {
+    const [parts, suppliers] = await Promise.all([
+      include.part ? selectByIds("part", rows.map((row) => row.partId)) : Promise.resolve(new Map()),
+      include.supplier ? selectByIds("supplier", rows.map((row) => row.supplierId)) : Promise.resolve(new Map()),
+    ]);
+    let partRows = Array.from(parts.values());
+    if (include.part?.include) {
+      partRows = await applyBatchedIncludes("part", partRows, include.part.include);
+    }
+    const partsWithIncludes = new Map(partRows.map((part) => [part.id, part]));
+
+    return rows.map((row) => ({
+      ...row,
+      ...(include.part ? { part: row.partId ? partsWithIncludes.get(row.partId) ?? null : null } : {}),
       ...(include.supplier ? { supplier: row.supplierId ? suppliers.get(row.supplierId) ?? null : null } : {}),
     }));
   }
@@ -378,6 +478,19 @@ async function applyIncludes(model: keyof typeof tableByModel, row: AnyRecord | 
     return next;
   }
 
+  if (model === "partVariant") {
+    const next = { ...row };
+    if (include.part) {
+      next.part = row.partId
+        ? await prisma.part.findUnique({ where: { id: row.partId }, include: include.part.include })
+        : null;
+    }
+    if (include.supplier) {
+      next.supplier = row.supplierId ? await prisma.supplier.findUnique({ where: { id: row.supplierId } }) : null;
+    }
+    return next;
+  }
+
   if (model === "order") {
     const next = { ...row };
     const users = async (id: string | null) => (id ? prisma.user.findUnique({ where: { id } }) : null);
@@ -471,6 +584,10 @@ function modelApi(model: keyof typeof tableByModel) {
     },
 
     async count(args: AnyRecord = {}) {
+      if (model === "partVariant" && hasRelationFilter(args.where)) {
+        return (await selectPartVariantRows({ where: args.where })).length;
+      }
+
       let query = supabase.from(tableByModel[model]).select("*", { count: "exact", head: true });
       query = applyWhere(query, args.where);
       const { count, error } = await query;
@@ -519,11 +636,11 @@ function modelApi(model: keyof typeof tableByModel) {
           .insert(toDbData(orderData))
           .select("*")
           .single();
-        if (error) throw new Error(error.message);
+        if (error) throw new Error(`${model}.create: ${error.message}`);
         const order = fromDbRow(data)!;
         const itemRows = items.create.map((item: AnyRecord) => toDbData({ ...item, orderId: order.id }));
         const { error: itemsError } = await supabase.from(tableByModel.orderItem).insert(itemRows);
-        if (itemsError) throw new Error(itemsError.message);
+        if (itemsError) throw new Error("orderItem.createMany: " + itemsError.message);
         return applyIncludes(model, order, args.include);
       }
 
@@ -532,7 +649,7 @@ function modelApi(model: keyof typeof tableByModel) {
         .insert(toDbData(args.data))
         .select("*")
         .single();
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(`${model}.create: ${error.message}`);
       return applyIncludes(model, fromDbRow(data)!, args.include);
     },
 
@@ -545,27 +662,29 @@ function modelApi(model: keyof typeof tableByModel) {
           .eq("id", args.where.id)
           .select("*")
           .single();
-        if (error) throw new Error(error.message);
+        if (error) throw new Error(`${model}.update: ${error.message}`);
         const itemRows = items.create.map((item: AnyRecord) => toDbData({ ...item, orderId: args.where.id }));
         if (itemRows.length) {
           const { error: itemsError } = await supabase.from(tableByModel.orderItem).insert(itemRows);
-          if (itemsError) throw new Error(itemsError.message);
+          if (itemsError) throw new Error("orderItem.createMany: " + itemsError.message);
         }
         return applyIncludes(model, fromDbRow(data)!, args.include);
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from(tableByModel[model])
         .update(toDbData(args.data))
-        .eq("id", args.where.id)
-        .select("*")
-        .single();
-      if (error) throw new Error(error.message);
+        .select("*");
+      query = applyExactWhere(query, args.where);
+      const { data, error } = await query.single();
+      if (error) throw new Error(`${model}.update: ${error.message}`);
       return applyIncludes(model, fromDbRow(data)!, args.include);
     },
 
     async delete(args: AnyRecord) {
-      const { error } = await supabase.from(tableByModel[model]).delete().eq("id", args.where.id);
+      let query = supabase.from(tableByModel[model]).delete();
+      query = applyExactWhere(query, args.where);
+      const { error } = await query;
       if (error) throw new Error(error.message);
       return {};
     },
@@ -580,18 +699,22 @@ function modelApi(model: keyof typeof tableByModel) {
     async upsert(args: AnyRecord) {
       const existing = await this.findUnique({ where: args.where });
       return existing
-        ? this.update({ where: args.where, data: args.update })
+        ? this.update({ where: { id: existing.id }, data: args.update })
         : this.create({ data: args.create });
     },
   };
 }
 
 export const prisma: any = {
+  async $transaction(callback: (tx: typeof prisma) => Promise<unknown>) {
+    return callback(prisma);
+  },
   user: modelApi("user"),
   category: modelApi("category"),
   supplier: modelApi("supplier"),
   customer: modelApi("customer"),
   part: modelApi("part"),
+  partVariant: modelApi("partVariant"),
   order: modelApi("order"),
   orderItem: modelApi("orderItem"),
   orderRevision: modelApi("orderRevision"),

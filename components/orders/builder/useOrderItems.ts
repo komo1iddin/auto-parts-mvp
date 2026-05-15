@@ -4,6 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import type { OrderItem, PartSearchResult } from "@/components/orders/types/orderBuilderTypes";
 import { buildOrderItem } from "@/components/orders/builder/orderBuilderUtils";
 
+function itemKey(item: OrderItem) {
+  return item.id ?? item.partVariantId ?? item.partId ?? item.localId ?? item.partCode;
+}
+
+function sameCatalogItem(a: OrderItem, b: OrderItem) {
+  return (
+    a.partCode.trim().toLowerCase() === b.partCode.trim().toLowerCase() &&
+    a.type.trim().toLowerCase() === b.type.trim().toLowerCase() &&
+    a.brand.trim().toLowerCase() === b.brand.trim().toLowerCase() &&
+    a.purchasePriceCny === b.purchasePriceCny &&
+    a.sellingPriceCny === b.sellingPriceCny
+  );
+}
+
 export function useOrderItems(initialItems: OrderItem[]) {
   const [items, setItems] = useState<OrderItem[]>(initialItems);
   const [deleteTarget, setDeleteTarget] = useState<OrderItem | null>(null);
@@ -21,33 +35,58 @@ export function useOrderItems(initialItems: OrderItem[]) {
   }, [undoState]);
 
   function addPart(part: PartSearchResult) {
-    const exists = items.find((item) => item.partId === part.id);
+    const exists = items.find((item) => item.partVariantId === part.id);
     if (exists) {
       setItems((current) => current.map((item) => (
-        item.partId === part.id ? { ...item, quantity: item.quantity + 1 } : item
+        item.partVariantId === part.id ? { ...item, quantity: item.quantity + 1 } : item
       )));
     } else {
       setItems((current) => [...current, buildOrderItem(part)]);
     }
   }
 
+  function addImportedItems(importedItems: OrderItem[]) {
+    setItems((current) => {
+      const next = [...current];
+
+      for (const importedItem of importedItems) {
+        const existingIndex = next.findIndex((item) => sameCatalogItem(item, importedItem));
+        if (existingIndex >= 0) {
+          const existing = next[existingIndex];
+          next[existingIndex] = {
+            ...existing,
+            ...importedItem,
+            id: existing.id,
+            localId: existing.localId,
+            quantity: existing.quantity + importedItem.quantity,
+            note: [existing.note, importedItem.note].filter(Boolean).join("; "),
+          };
+        } else {
+          next.push(importedItem);
+        }
+      }
+
+      return next;
+    });
+  }
+
   function updateQty(partId: string, qty: number) {
     const safe = Math.max(0, Math.floor(qty));
     setItems((current) => current.map((item) => (
-      item.partId === partId ? { ...item, quantity: safe } : item
+      itemKey(item) === partId ? { ...item, quantity: safe } : item
     )));
   }
 
   function updateField<K extends keyof OrderItem>(partId: string, field: K, value: OrderItem[K]) {
     setItems((current) => current.map((item) => (
-      item.partId === partId ? { ...item, [field]: value } : item
+      itemKey(item) === partId ? { ...item, [field]: value } : item
     )));
   }
 
   function removeItem(partId: string) {
-    const index = items.findIndex((item) => item.partId === partId);
+    const index = items.findIndex((item) => itemKey(item) === partId);
     const item = items[index];
-    setItems((current) => current.filter((currentItem) => currentItem.partId !== partId));
+    setItems((current) => current.filter((currentItem) => itemKey(currentItem) !== partId));
     setDeleteTarget(null);
     if (item) setUndoState({ item, index });
   }
@@ -69,6 +108,7 @@ export function useOrderItems(initialItems: OrderItem[]) {
     undoState,
     setUndoState,
     addPart,
+    addImportedItems,
     updateQty,
     updateField,
     removeItem,

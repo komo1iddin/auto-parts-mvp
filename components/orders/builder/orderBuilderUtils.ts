@@ -34,7 +34,9 @@ export function buildOrderChangelog(originalItems: OrderItem[], items: OrderItem
 
 export function buildOrderItem(part: PartSearchResult): OrderItem {
   return {
-    partId: part.id,
+    localId: `part-${part.id}`,
+    partId: part.partId,
+    partVariantId: part.id,
     partCode: part.code,
     partName: part.name ?? "",
     categoryName: part.category?.name ?? "",
@@ -51,10 +53,9 @@ export function buildOrderItem(part: PartSearchResult): OrderItem {
 }
 
 export function getDuplicateCodes(items: OrderItem[]) {
+  const keys = items.map((item) => `${item.partCode.trim().toLowerCase()}::${item.type}`);
   return new Set(
-    items
-      .map((item) => item.partCode)
-      .filter((code, _, allCodes) => allCodes.filter((itemCode) => itemCode === code).length > 1)
+    keys.filter((key, _, allKeys) => allKeys.filter((itemKey) => itemKey === key).length > 1)
   );
 }
 

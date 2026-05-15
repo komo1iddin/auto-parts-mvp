@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 export interface DetailItem {
   id: string;
   partId?: string | null;
+  partVariantId?: string | null;
   partCode: string;
   partName: string | null;
   type: string | null;

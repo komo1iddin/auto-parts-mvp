@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
       items: {
         create: items.map((item: {
           partId?: string;
+          partVariantId?: string;
           partCode: string;
           partName?: string;
           categoryName?: string;
@@ -107,6 +108,7 @@ export async function POST(req: NextRequest) {
           note?: string;
         }) => ({
           partId: item.partId || null,
+          partVariantId: item.partVariantId || null,
           partCode: item.partCode,
           partName: item.partName || null,
           categoryName: item.categoryName || null,

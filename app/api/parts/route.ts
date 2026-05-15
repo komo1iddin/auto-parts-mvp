@@ -47,28 +47,41 @@ export async function POST(req: NextRequest) {
   if (!code) return Response.json({ error: "Qism kodi majburiy" }, { status: 400 });
 
   try {
-    const part = await prisma.part.create({
-      data: {
-        code: code.trim(),
-        name: name?.trim() || null,
-        categoryId: categoryId || null,
-        brand: brand?.trim() || null,
-        type: type || "original",
-        purchasePriceCny: purchasePriceCny ? Number(purchasePriceCny) : null,
-        wholesalePriceCny: wholesalePriceCny ? Number(wholesalePriceCny) : null,
-        sellingPriceCny: sellingPriceCny ? Number(sellingPriceCny) : null,
-        supplierId: supplierId || null,
-        imageUrl: imageUrl || null,
-        note: note?.trim() || null,
-      },
-      include: { category: true, supplier: true },
+    const part = await prisma.$transaction(async (tx) => {
+      const family = await tx.part.upsert({
+        where: { code: code.trim() },
+        update: {
+          name: name?.trim() || undefined,
+          categoryId: categoryId || undefined,
+        },
+        create: {
+          code: code.trim(),
+          name: name?.trim() || null,
+          categoryId: categoryId || null,
+        },
+      });
+
+      return tx.partVariant.create({
+        data: {
+          partId: family.id,
+          brand: brand?.trim() || null,
+          type: type || "original",
+          purchasePriceCny: purchasePriceCny ? Number(purchasePriceCny) : null,
+          wholesalePriceCny: wholesalePriceCny ? Number(wholesalePriceCny) : null,
+          sellingPriceCny: sellingPriceCny ? Number(sellingPriceCny) : null,
+          supplierId: supplierId || null,
+          imageUrl: imageUrl || null,
+          note: note?.trim() || null,
+        },
+        include: { part: { include: { category: true } }, supplier: true },
+      });
     });
     revalidateAppData("parts");
     return Response.json({ part }, { status: 201 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
     if (msg.includes("Unique constraint")) {
-      return Response.json({ error: "Bu qism kodi allaqachon mavjud" }, { status: 409 });
+      return Response.json({ error: "Bu part number uchun bunday variant allaqachon mavjud" }, { status: 409 });
     }
     return Response.json({ error: "Xatolik yuz berdi" }, { status: 500 });
   }

@@ -26,7 +26,7 @@ export function OrderItemsTable({ items, isAdmin, suppliers, partQualityTypes, d
         .filter((type) => type && !baseTypeOptions.some((option) => option.value === type))
     )
   ).map((type) => ({ value: type, label: type }));
-  const typeOptions = [...baseTypeOptions, ...unknownTypeOptions];
+  const typeOptions = [{ value: "", label: "—" }, ...baseTypeOptions, ...unknownTypeOptions];
   const supplierOptions = [
     { value: "", label: "—" },
     ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name })),
@@ -58,12 +58,12 @@ export function OrderItemsTable({ items, isAdmin, suppliers, partQualityTypes, d
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {items.map((item, index) => (
                 <OrderItemsTableRow
-                  key={item.partId}
+                  key={item.id ?? item.localId ?? `${item.partVariantId || item.partId || item.partCode}-${item.type}-${index}`}
                   item={item}
                   isAdmin={isAdmin}
-                  duplicate={duplicateCodes.has(item.partCode)}
+                  duplicate={duplicateCodes.has(`${item.partCode.trim().toLowerCase()}::${item.type}`)}
                   typeOptions={typeOptions}
                   supplierOptions={supplierOptions}
                   suppliers={suppliers}

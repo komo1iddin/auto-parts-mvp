@@ -57,7 +57,10 @@ export function OrderBuilderModals({
               <Button variant="secondary" onClick={onCloseDelete}>
                 Bekor qilish
               </Button>
-              <Button variant="destructive" onClick={() => onConfirmDelete(deleteTarget.partId)}>
+              <Button
+                variant="destructive"
+                onClick={() => onConfirmDelete(deleteTarget.id ?? deleteTarget.partId ?? deleteTarget.localId ?? deleteTarget.partCode)}
+              >
                 O'chirish
               </Button>
             </div>

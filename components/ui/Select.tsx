@@ -5,10 +5,12 @@ import {
   SelectHTMLAttributes,
   isValidElement,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,16 +41,53 @@ function getSelectOptions(children: React.ReactNode): SelectOption[] {
 
 export function Select({ label, error, className, children, value, defaultValue, onChange, disabled, ...props }: SelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const [mounted, setMounted] = useState(false);
   const options = useMemo(() => getSelectOptions(children), [children]);
   const selectedValue = String(value ?? defaultValue ?? "");
   const selected = options.find((option) => option.value === selectedValue) ?? options[0];
+
+  useEffect(() => setMounted(true), []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    function positionDropdown() {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const spaceAbove = rect.top - 8;
+      const maxHeight = Math.max(160, Math.min(256, Math.max(spaceBelow, spaceAbove)));
+      const openAbove = spaceBelow < 180 && spaceAbove > spaceBelow;
+
+      setDropdownStyle({
+        position: "fixed",
+        top: openAbove ? undefined : rect.bottom + 4,
+        bottom: openAbove ? window.innerHeight - rect.top + 4 : undefined,
+        left: rect.left,
+        width: rect.width,
+        maxHeight,
+      });
+    }
+
+    positionDropdown();
+    window.addEventListener("resize", positionDropdown);
+    window.addEventListener("scroll", positionDropdown, true);
+    return () => {
+      window.removeEventListener("resize", positionDropdown);
+      window.removeEventListener("scroll", positionDropdown, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
 
     function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+      setOpen(false);
     }
 
     document.addEventListener("pointerdown", handlePointerDown);
@@ -107,10 +146,12 @@ export function Select({ label, error, className, children, value, defaultValue,
         >
           {children}
         </select>
-        {open && (
+        {mounted && open && createPortal(
           <div
+            ref={dropdownRef}
             role="listbox"
-            className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border border-input bg-popover p-1 text-popover-foreground shadow-lg"
+            style={dropdownStyle}
+            className="z-[100] overflow-auto rounded-md border border-input bg-popover p-1 text-popover-foreground shadow-lg"
           >
             {options.map((option) => (
               <button
@@ -129,7 +170,8 @@ export function Select({ label, error, className, children, value, defaultValue,
                 <span className="truncate">{option.label}</span>
               </button>
             ))}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}

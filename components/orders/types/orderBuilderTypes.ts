@@ -16,6 +16,7 @@ export interface SettingOption {
 
 export interface PartSearchResult {
   id: string;
+  partId: string;
   code: string;
   name: string | null;
   brand: string | null;
@@ -28,7 +29,10 @@ export interface PartSearchResult {
 }
 
 export interface OrderItem {
+  id?: string;
+  localId?: string;
   partId: string;
+  partVariantId?: string;
   partCode: string;
   partName: string;
   categoryName: string;

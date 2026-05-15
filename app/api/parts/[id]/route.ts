@@ -11,9 +11,9 @@ export async function GET(
   const user = await getAuthUser();
   const isAdmin = user?.role === "admin";
 
-  const part = await prisma.part.findUnique({
+  const part = await prisma.partVariant.findUnique({
     where: { id },
-    include: { category: true, supplier: true },
+    include: { part: { include: { category: true } }, supplier: true },
   });
 
   if (!part) return Response.json({ error: "Topilmadi" }, { status: 404 });
@@ -21,6 +21,10 @@ export async function GET(
   return Response.json({
     part: {
       ...part,
+      code: part.part.code,
+      name: part.part.name,
+      categoryId: part.part.categoryId,
+      category: part.part.category,
       purchasePriceCny: isAdmin ? part.purchasePriceCny : undefined,
       wholesalePriceCny: isAdmin ? part.wholesalePriceCny : undefined,
       supplier: isAdmin ? part.supplier : undefined,
@@ -47,23 +51,41 @@ export async function PUT(
     supplierId, imageUrl, note,
   } = body;
 
+  if (!code?.trim()) return Response.json({ error: "Qism kodi majburiy" }, { status: 400 });
+
   try {
-    const part = await prisma.part.update({
-      where: { id },
-      data: {
-        code: code?.trim(),
-        name: name?.trim() || null,
-        categoryId: categoryId || null,
-        brand: brand?.trim() || null,
-        type: type || "original",
-        purchasePriceCny: purchasePriceCny != null ? Number(purchasePriceCny) : null,
-        wholesalePriceCny: wholesalePriceCny != null ? Number(wholesalePriceCny) : null,
-        sellingPriceCny: sellingPriceCny != null ? Number(sellingPriceCny) : null,
-        supplierId: supplierId || null,
-        imageUrl: imageUrl || null,
-        note: note?.trim() || null,
-      },
-      include: { category: true, supplier: true },
+    const part = await prisma.$transaction(async (tx) => {
+      const existing = await tx.partVariant.findUnique({ where: { id } });
+      if (!existing) throw new Error("Topilmadi");
+
+      const family = await tx.part.upsert({
+        where: { code: code?.trim() || "" },
+        update: {
+          name: name?.trim() || null,
+          categoryId: categoryId || null,
+        },
+        create: {
+          code: code?.trim() || "",
+          name: name?.trim() || null,
+          categoryId: categoryId || null,
+        },
+      });
+
+      return tx.partVariant.update({
+        where: { id },
+        data: {
+          partId: family.id,
+          brand: brand?.trim() || null,
+          type: type || "original",
+          purchasePriceCny: purchasePriceCny != null ? Number(purchasePriceCny) : null,
+          wholesalePriceCny: wholesalePriceCny != null ? Number(wholesalePriceCny) : null,
+          sellingPriceCny: sellingPriceCny != null ? Number(sellingPriceCny) : null,
+          supplierId: supplierId || null,
+          imageUrl: imageUrl || null,
+          note: note?.trim() || null,
+        },
+        include: { part: { include: { category: true } }, supplier: true },
+      });
     });
     revalidateAppData("parts");
     return Response.json({ part });
@@ -83,7 +105,7 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  await prisma.part.delete({ where: { id } });
+  await prisma.partVariant.delete({ where: { id } });
   revalidateAppData("parts");
   return Response.json({ ok: true });
 }

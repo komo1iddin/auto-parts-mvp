@@ -1,6 +1,7 @@
 "use client";
 
 import { OrderBuilderBar } from "@/components/orders/builder/OrderBuilderBar";
+import { OrderExcelImport } from "@/components/orders/builder/OrderExcelImport";
 import { OrderBuilderModals } from "@/components/orders/builder/OrderBuilderModals";
 import { OrderBuilderOptions } from "@/components/orders/builder/OrderBuilderOptions";
 import { OrderItemsTable } from "@/components/orders/builder/OrderItemsTable";
@@ -25,6 +26,8 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = 
 
   return (
     <div className="space-y-6">
+      <OrderExcelImport onImportItems={builder.addImportedItems} />
+
       <OrderPartSearch
         query={builder.q}
         searching={builder.searching}

@@ -120,6 +120,7 @@ export function useOrderBuilder({ existingOrder, redirectTo, ordersPath }: UseOr
     undoState: orderItems.undoState,
     setUndoState: orderItems.setUndoState,
     addPart: addPartAndClearSearch,
+    addImportedItems: orderItems.addImportedItems,
     updateQty: orderItems.updateQty,
     updateField: orderItems.updateField,
     removeItem: orderItems.removeItem,

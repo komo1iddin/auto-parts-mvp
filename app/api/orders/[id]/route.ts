@@ -4,6 +4,83 @@ import { requireAdminOrManager, unauthorized } from "@/lib/auth";
 import { revalidateAppData } from "@/lib/data";
 import { isEditableOrderStatus } from "@/lib/utils";
 
+type IncomingOrderItem = {
+  id?: string;
+  partId?: string;
+  partVariantId?: string;
+  partCode: string;
+  partName?: string;
+  categoryName?: string;
+  brand?: string;
+  type?: string;
+  purchasePriceCny?: number | null;
+  wholesalePriceCny?: number | null;
+  sellingPriceCny?: number | null;
+  supplierId?: string | null;
+  supplierName?: string | null;
+  quantity: number;
+  note?: string | null;
+};
+
+type ExistingOrderItem = IncomingOrderItem & {
+  id: string;
+};
+
+function numberOrPrevious(value: unknown, previous: unknown) {
+  if (value != null && value !== "") return Number(value);
+  if (previous != null && previous !== "") return Number(previous);
+  return null;
+}
+
+function stringOrPrevious(value: unknown, previous: unknown) {
+  const next = typeof value === "string" ? value.trim() : value;
+  if (next) return String(next);
+  if (previous) return String(previous);
+  return null;
+}
+
+function buildReplacementItems(items: IncomingOrderItem[], existingItems: ExistingOrderItem[]) {
+  const usedExistingIds = new Set<string>();
+
+  return items.map((item) => {
+    const previousById = item.id
+      ? existingItems.find((existingItem) => existingItem.id === item.id)
+      : undefined;
+    const previousByPartId = item.partId
+      ? existingItems.find((existingItem) => (
+          !usedExistingIds.has(existingItem.id) && existingItem.partId === item.partId
+        ))
+      : undefined;
+    const previousByPartVariantId = item.partVariantId
+      ? existingItems.find((existingItem) => (
+          !usedExistingIds.has(existingItem.id) && existingItem.partVariantId === item.partVariantId
+        ))
+      : undefined;
+    const previousByCode = existingItems.find((existingItem) => (
+      !usedExistingIds.has(existingItem.id) && existingItem.partCode === item.partCode
+    ));
+    const previous = previousById ?? previousByPartVariantId ?? previousByPartId ?? previousByCode;
+    if (previous) usedExistingIds.add(previous.id);
+
+    return {
+      partId: item.partId || previous?.partId || null,
+      partVariantId: item.partVariantId || previous?.partVariantId || null,
+      partCode: item.partCode,
+      partName: item.partName || previous?.partName || null,
+      categoryName: item.categoryName || previous?.categoryName || null,
+      brand: item.brand || previous?.brand || null,
+      type: item.type || previous?.type || null,
+      purchasePriceCny: numberOrPrevious(item.purchasePriceCny, previous?.purchasePriceCny),
+      wholesalePriceCny: numberOrPrevious(item.wholesalePriceCny, previous?.wholesalePriceCny),
+      sellingPriceCny: numberOrPrevious(item.sellingPriceCny, previous?.sellingPriceCny),
+      supplierId: stringOrPrevious(item.supplierId, previous?.supplierId),
+      supplierName: stringOrPrevious(item.supplierName, previous?.supplierName),
+      quantity: Number(item.quantity) || previous?.quantity || 1,
+      note: item.note || previous?.note || null,
+    };
+  });
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -74,6 +151,9 @@ export async function PUT(
   if (status != null && !isEditableOrderStatus(status)) {
     return Response.json({ error: "Buyurtma holati noto'g'ri" }, { status: 400 });
   }
+  if (!Array.isArray(items) || items.length === 0) {
+    return Response.json({ error: "Kamida bitta qism kerak" }, { status: 400 });
+  }
   const customer = await prisma.customer.findUnique({ where: { id: customerId } });
   if (!customer) {
     return Response.json({ error: "Mijoz topilmadi" }, { status: 400 });
@@ -96,66 +176,53 @@ export async function PUT(
   const newVersion = existing.version + 1;
   const baseParts = existing.baseOrderNumber;
   const newOrderNumber = `${baseParts}-V${newVersion}`;
+  const replacementItems = buildReplacementItems(items, existing.items);
+  const createdItemIds: string[] = [];
 
-  // Delete old items and create new ones
-  await prisma.orderItem.deleteMany({ where: { orderId: id } });
+  try {
+    for (const item of replacementItems) {
+      const created = await prisma.orderItem.create({ data: { ...item, orderId: id } });
+      createdItemIds.push(created.id);
+    }
 
-  const updated = await prisma.order.update({
-    where: { id },
-    data: {
-      currentOrderNumber: newOrderNumber,
-      version: newVersion,
-      status: status ?? "updated",
-      customerId,
-      updatedBy: user.id,
-      items: {
-        create: (items ?? []).map((item: {
-          partId?: string;
-          partCode: string;
-          partName?: string;
-          categoryName?: string;
-          brand?: string;
-          type?: string;
-          purchasePriceCny?: number;
-          wholesalePriceCny?: number;
-          sellingPriceCny?: number;
-          supplierId?: string;
-          supplierName?: string;
-          quantity: number;
-          note?: string;
-        }) => ({
-          partId: item.partId || null,
-          partCode: item.partCode,
-          partName: item.partName || null,
-          categoryName: item.categoryName || null,
-          brand: item.brand || null,
-          type: item.type || null,
-          purchasePriceCny: item.purchasePriceCny != null ? Number(item.purchasePriceCny) : null,
-          wholesalePriceCny: item.wholesalePriceCny != null ? Number(item.wholesalePriceCny) : null,
-          sellingPriceCny: item.sellingPriceCny != null ? Number(item.sellingPriceCny) : null,
-          supplierId: item.supplierId || null,
-          supplierName: item.supplierName || null,
-          quantity: Number(item.quantity) || 1,
-          note: item.note || null,
-        })),
+    const updated = await prisma.order.update({
+      where: { id },
+      data: {
+        currentOrderNumber: newOrderNumber,
+        version: newVersion,
+        status: status ?? "updated",
+        customerId,
+        updatedBy: user.id,
       },
-    },
-    include: { items: true, creator: { select: { name: true } }, customer: { select: { name: true } } },
-  });
+      include: { items: true, creator: { select: { name: true } }, customer: { select: { name: true } } },
+    });
 
-  await prisma.orderRevision.create({
-    data: {
-      orderId: id,
-      version: newVersion,
-      oldOrderNumber: existing.currentOrderNumber,
-      newOrderNumber,
-      changedBy: user.id,
-      changeNote: changeNote || null,
-    },
-  });
+    for (const item of existing.items) {
+      await prisma.orderItem.delete({ where: { id: item.id } });
+    }
 
-  revalidateAppData("orders");
-  return Response.json({ order: updated });
+    await prisma.orderRevision.create({
+      data: {
+        orderId: id,
+        version: newVersion,
+        oldOrderNumber: existing.currentOrderNumber,
+        newOrderNumber,
+        changedBy: user.id,
+        changeNote: changeNote || null,
+      },
+    });
+
+    revalidateAppData("orders");
+    return Response.json({ order: updated });
+  } catch (error) {
+    for (const createdId of createdItemIds) {
+      await prisma.orderItem.delete({ where: { id: createdId } }).catch(() => {});
+    }
+
+    const message = error instanceof Error ? error.message : "Xatolik yuz berdi";
+    return Response.json({ error: message }, { status: 500 });
+  }
+
 }
 
 export async function PATCH(

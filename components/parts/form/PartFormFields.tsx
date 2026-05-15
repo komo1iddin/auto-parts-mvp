@@ -33,11 +33,11 @@ export function PartFormFields({
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input
-          label="Qism kodi *"
+          label="Part number *"
           value={form.code}
           onChange={(event) => onChange("code", event.target.value)}
           required
-          placeholder="Masalan: TY-1234-A"
+          placeholder="Masalan: 51751-47000"
         />
         <Input
           label="Nomi"
@@ -67,7 +67,7 @@ export function PartFormFields({
         </Select>
 
         <Select
-          label="Turi"
+          label="Quality"
           value={form.type}
           onChange={(event) => onChange("type", event.target.value)}
         >

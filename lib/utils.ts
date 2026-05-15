@@ -24,8 +24,21 @@ export function cn(...classes: (string | undefined | false | null)[]): string {
 export const PART_TYPES: Record<string, string> = {
   original: "Original",
   oem: "OEM",
-  copy: "Kopiya",
-  analog: "Analog",
+  aftermarket: "Aftermarket",
+  copy: "Copy",
+  used: "Used",
+  refurbished: "Refurbished",
+  analog: "Aftermarket",
+};
+
+export const PART_TYPE_STYLES: Record<string, string> = {
+  original: "bg-green-100 text-green-700",
+  oem: "bg-blue-100 text-blue-700",
+  aftermarket: "bg-orange-100 text-orange-700",
+  analog: "bg-orange-100 text-orange-700",
+  copy: "bg-red-50 text-red-700",
+  used: "bg-gray-100 text-gray-700",
+  refurbished: "bg-teal-100 text-teal-700",
 };
 
 export const ORDER_STATUS_OPTIONS = [

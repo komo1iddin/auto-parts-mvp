@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/Button";
-import { PART_TYPES, formatCny } from "@/lib/utils";
+import { PART_TYPES, PART_TYPE_STYLES, formatCny } from "@/lib/utils";
 import type { Part } from "@/components/parts/types/parts";
 
 interface PartsTableProps {
@@ -26,11 +26,11 @@ export function PartsTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 bg-gray-50">
-            <th className="px-4 py-3 text-left font-medium text-gray-500">Kod</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-500">Part number</th>
             <th className="px-4 py-3 text-left font-medium text-gray-500">Nomi</th>
             <th className="px-4 py-3 text-left font-medium text-gray-500">Kategoriya</th>
             <th className="px-4 py-3 text-left font-medium text-gray-500">Brend</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-500">Turi</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-500">Quality</th>
             {isAdmin && (
               <th className="px-4 py-3 text-left font-medium text-gray-500">Xarid (¥)</th>
             )}
@@ -96,7 +96,7 @@ function PartsTableRow({
       <td className="px-4 py-3 text-gray-500">{part.category?.name ?? "-"}</td>
       <td className="px-4 py-3 text-gray-500">{part.brand ?? "-"}</td>
       <td className="px-4 py-3">
-        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+        <span className={`rounded-full px-2 py-0.5 text-xs ${PART_TYPE_STYLES[part.type] ?? "bg-gray-100 text-gray-600"}`}>
           {PART_TYPES[part.type] ?? part.type}
         </span>
       </td>

@@ -352,36 +352,41 @@ export const getPartsList = unstable_cache(
         q
           ? {
               OR: [
-                { code: { contains: q, mode: "insensitive" as const } },
-                { name: { contains: q, mode: "insensitive" as const } },
+                { part: { code: { contains: q, mode: "insensitive" as const } } },
+                { part: { name: { contains: q, mode: "insensitive" as const } } },
                 { brand: { contains: q, mode: "insensitive" as const } },
               ],
             }
           : {},
-        categoryId ? { categoryId } : {},
+        categoryId ? { part: { categoryId } } : {},
         supplierId ? { supplierId } : {},
         brand ? { brand: { contains: brand, mode: "insensitive" as const } } : {},
       ],
     };
 
-    const [parts, total] = await Promise.all([
-      prisma.part.findMany({
+    const [variants, total] = await Promise.all([
+      prisma.partVariant.findMany({
         where,
-        include: { category: true, supplier: true },
+        include: { part: { include: { category: true } }, supplier: true },
         orderBy: { createdAt: "desc" },
         take,
         skip,
       }),
-      prisma.part.count({ where }),
+      prisma.partVariant.count({ where }),
     ]);
 
     const isAdmin = role === "admin";
-    const sanitized = parts.map((part) => ({
-      ...part,
-      purchasePriceCny: isAdmin ? part.purchasePriceCny : undefined,
-      wholesalePriceCny: isAdmin ? part.wholesalePriceCny : undefined,
-      supplier: isAdmin ? part.supplier : undefined,
-      note: isAdmin ? part.note : undefined,
+    const sanitized = variants.map((variant) => ({
+      ...variant,
+      partId: variant.partId,
+      code: variant.part.code,
+      name: variant.part.name,
+      categoryId: variant.part.categoryId,
+      category: variant.part.category,
+      purchasePriceCny: isAdmin ? variant.purchasePriceCny : undefined,
+      wholesalePriceCny: isAdmin ? variant.wholesalePriceCny : undefined,
+      supplier: isAdmin ? variant.supplier : undefined,
+      note: isAdmin ? variant.note : undefined,
     }));
 
     return { parts: sanitized, total };

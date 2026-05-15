@@ -46,7 +46,7 @@ model Supplier {
   note      String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  parts    Part[]
+  partVariants PartVariant[]
   exports  OrderExport[]
   payments SupplierPayment[]
 
@@ -79,10 +79,23 @@ model SettingOption {
 }
 
 model Part {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code       String   @unique
+  name       String?
+  categoryId String?  @map("category_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  category   Category?   @relation(fields: [categoryId], references: [id])
+  variants   PartVariant[]
+  orderItems OrderItem[]
+
+  @@map("parts")
+}
+
+model PartVariant {
   id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code              String   @unique
-  name              String?
-  categoryId        String?  @map("category_id") @db.Uuid
+  partId            String   @map("part_id") @db.Uuid
   brand             String?
   type              String   @default("original")
   purchasePriceCny  Decimal? @map("purchase_price_cny") @db.Decimal(12, 2)
@@ -94,11 +107,14 @@ model Part {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
 
-  category   Category?   @relation(fields: [categoryId], references: [id])
+  part       Part        @relation(fields: [partId], references: [id], onDelete: Cascade)
   supplier   Supplier?   @relation(fields: [supplierId], references: [id])
   orderItems OrderItem[]
 
-  @@map("parts")
+  @@unique([partId, brand, type, supplierId])
+  @@index([partId])
+  @@index([supplierId])
+  @@map("part_variants")
 }
 
 model Order {
@@ -130,6 +146,7 @@ model OrderItem {
   id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderId           String   @map("order_id") @db.Uuid
   partId            String?  @map("part_id") @db.Uuid
+  partVariantId     String?  @map("part_variant_id") @db.Uuid
   partCode          String   @map("part_code")
   partName          String?  @map("part_name")
   categoryName      String?  @map("category_name")
@@ -145,7 +162,9 @@ model OrderItem {
 
   order Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
   part  Part?  @relation(fields: [partId], references: [id])
+  partVariant PartVariant? @relation(fields: [partVariantId], references: [id])
 
+  @@index([partVariantId])
   @@map("order_items")
 }
 

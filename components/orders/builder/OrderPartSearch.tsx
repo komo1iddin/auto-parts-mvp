@@ -34,7 +34,7 @@ export function OrderPartSearch({
         {results.length > 0 && (
           <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
             {results.map((part) => {
-              const alreadyInOrder = items.some((item) => item.partCode === part.code);
+              const alreadyInOrder = items.some((item) => item.partVariantId === part.id);
               return (
                 <button
                   key={part.id}

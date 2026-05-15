@@ -38,6 +38,7 @@ export type PartFormDefaultValues = Partial<PartFormData> & {
 
 export interface Part {
   id: string;
+  partId: string;
   code: string;
   name: string | null;
   brand: string | null;

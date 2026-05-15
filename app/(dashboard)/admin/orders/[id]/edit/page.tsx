@@ -38,7 +38,9 @@ export default async function EditOrderPage({
           status: order.status,
           customerId: order.customerId,
           items: order.items.map((i) => ({
-            partId: i.partId ?? i.id,
+            id: i.id,
+            partId: i.partId ?? "",
+            partVariantId: i.partVariantId ?? "",
             partCode: i.partCode,
             partName: i.partName ?? "",
             categoryName: i.categoryName ?? "",

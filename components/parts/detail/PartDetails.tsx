@@ -26,11 +26,11 @@ export function PartDetails({
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <DetailItem label="Kod" value={part.code} mono />
+        <DetailItem label="Part number" value={part.code} mono />
         <DetailItem label="Nomi" value={part.name} />
         <DetailItem label="Kategoriya" value={part.category?.name} />
         <DetailItem label="Brend" value={part.brand} />
-        <DetailItem label="Turi" value={PART_TYPES[part.type] ?? part.type} />
+        <DetailItem label="Quality" value={PART_TYPES[part.type] ?? part.type} />
         <DetailItem label="Sotuv narxi" value={formatCny(part.sellingPriceCny?.toString())} />
         {isAdmin && <DetailItem label="Xarid narxi" value={formatCny(part.purchasePriceCny?.toString())} />}
         {isAdmin && <DetailItem label="Ulgurji narx" value={formatCny(part.wholesalePriceCny?.toString())} />}
