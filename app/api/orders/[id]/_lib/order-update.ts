@@ -1,0 +1,102 @@
+import { prisma } from "@/lib/prisma";
+import { revalidateAppData } from "@/lib/data";
+import { isEditableOrderStatus } from "@/lib/utils";
+import { buildReplacementItems } from "./order-items";
+import { canAccessOrder } from "./order-access";
+import type { ExistingOrderItem, IncomingOrderItem, OrderRouteUser } from "./order-types";
+
+type UpdateOrderBody = {
+  customerId?: string;
+  items?: IncomingOrderItem[];
+  status?: string;
+  changeNote?: string | null;
+};
+
+export async function updateOrderResponse(id: string, user: OrderRouteUser, body: UpdateOrderBody) {
+  const validation = await validateOrderUpdate(body);
+  if (validation) return validation;
+
+  const existing = await prisma.order.findUnique({
+    where: { id },
+    include: { items: true },
+  });
+  if (!existing) return Response.json({ error: "Topilmadi" }, { status: 404 });
+  if (!canAccessOrder(user, existing.createdBy)) {
+    return Response.json({ error: "Ruxsat yo'q" }, { status: 403 });
+  }
+  if (existing.status === "cancelled") {
+    return Response.json({ error: "Bekor qilingan buyurtmani tahrirlash mumkin emas" }, { status: 400 });
+  }
+
+  return replaceOrderItemsAndVersion(id, user, body, existing);
+}
+
+async function validateOrderUpdate(body: UpdateOrderBody) {
+  const { customerId, items, status } = body;
+  if (!customerId) return Response.json({ error: "Mijoz tanlash majburiy" }, { status: 400 });
+  if (status != null && !isEditableOrderStatus(status)) {
+    return Response.json({ error: "Buyurtma holati noto'g'ri" }, { status: 400 });
+  }
+  if (!Array.isArray(items) || items.length === 0) {
+    return Response.json({ error: "Kamida bitta qism kerak" }, { status: 400 });
+  }
+
+  const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+  return customer ? null : Response.json({ error: "Mijoz topilmadi" }, { status: 400 });
+}
+
+async function replaceOrderItemsAndVersion(
+  id: string,
+  user: OrderRouteUser,
+  body: UpdateOrderBody,
+  existing: { version: number; baseOrderNumber: string; currentOrderNumber: string; items: ExistingOrderItem[] }
+) {
+  const newVersion = existing.version + 1;
+  const newOrderNumber = `${existing.baseOrderNumber}-V${newVersion}`;
+  const replacementItems = buildReplacementItems(body.items ?? [], existing.items);
+  const createdItemIds: string[] = [];
+
+  try {
+    for (const item of replacementItems) {
+      const created = await prisma.orderItem.create({ data: { ...item, orderId: id } });
+      createdItemIds.push(created.id);
+    }
+
+    const updated = await prisma.order.update({
+      where: { id },
+      data: {
+        currentOrderNumber: newOrderNumber,
+        version: newVersion,
+        status: body.status ?? "updated",
+        customerId: body.customerId,
+        updatedBy: user.id,
+      },
+      include: { items: true, creator: { select: { name: true } }, customer: { select: { name: true } } },
+    });
+
+    for (const item of existing.items) {
+      await prisma.orderItem.delete({ where: { id: item.id } });
+    }
+
+    await prisma.orderRevision.create({
+      data: {
+        orderId: id,
+        version: newVersion,
+        oldOrderNumber: existing.currentOrderNumber,
+        newOrderNumber,
+        changedBy: user.id,
+        changeNote: body.changeNote || null,
+      },
+    });
+
+    revalidateAppData("orders");
+    return Response.json({ order: updated });
+  } catch (error) {
+    for (const createdId of createdItemIds) {
+      await prisma.orderItem.delete({ where: { id: createdId } }).catch(() => {});
+    }
+
+    const message = error instanceof Error ? error.message : "Xatolik yuz berdi";
+    return Response.json({ error: message }, { status: 500 });
+  }
+}
