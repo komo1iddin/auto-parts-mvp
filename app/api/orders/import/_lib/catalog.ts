@@ -55,6 +55,9 @@ export function findCatalogPartForRow(
   if (exactPart) return exactPart;
 
   const sameCode = partsByCode.get(normalizeKey(row.partCode)) ?? [];
+  const priceMatchedPart = row.brand ? undefined : findPriceMatchedPart(row, sameCode);
+  if (priceMatchedPart) return priceMatchedPart;
+
   const sameType = sameCode.filter((part) => part.type === row.type);
   if (!sameType.length || row.brand) return undefined;
 

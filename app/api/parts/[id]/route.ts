@@ -3,6 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin, getAuthUser, forbidden } from "@/lib/auth";
 import { revalidateAppData } from "@/lib/data";
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "";
+}
+
+function isUniqueConflict(error: unknown) {
+  const message = errorMessage(error).toLowerCase();
+  return message.includes("unique constraint") || message.includes("duplicate key");
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -89,7 +98,13 @@ export async function PUT(
     });
     revalidateAppData("parts");
     return Response.json({ part });
-  } catch {
+  } catch (error) {
+    if (errorMessage(error) === "Topilmadi") {
+      return Response.json({ error: "Topilmadi" }, { status: 404 });
+    }
+    if (isUniqueConflict(error)) {
+      return Response.json({ error: "Bu part number uchun bunday variant allaqachon mavjud" }, { status: 409 });
+    }
     return Response.json({ error: "Xatolik yuz berdi" }, { status: 500 });
   }
 }

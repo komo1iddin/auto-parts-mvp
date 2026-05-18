@@ -48,18 +48,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const part = await prisma.$transaction(async (tx) => {
-      const family = await tx.part.upsert({
-        where: { code: code.trim() },
-        update: {
-          name: name?.trim() || undefined,
-          categoryId: categoryId || undefined,
-        },
-        create: {
-          code: code.trim(),
-          name: name?.trim() || null,
-          categoryId: categoryId || null,
-        },
-      });
+      let family = await tx.part.findUnique({ where: { code: code.trim() } });
+      if (!family) {
+        family = await tx.part.create({
+          data: {
+            code: code.trim(),
+            name: name?.trim() || null,
+            categoryId: categoryId || null,
+          },
+        });
+      }
 
       return tx.partVariant.create({
         data: {

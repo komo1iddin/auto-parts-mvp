@@ -5,7 +5,7 @@ import { HEADER_ALIASES, TYPE_ALIASES, type HeaderField } from "./workbook-alias
 
 const SUPPLIER_PRICE_COLUMNS = [
   { header: "jac", label: "JAC", type: "original" },
-  { header: "brand", label: "Brand", type: "oem" },
+  { header: "brand", label: "Brand", type: "brand" },
   { header: "af", label: "AF", type: "aftermarket" },
 ] as const;
 
