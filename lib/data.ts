@@ -22,8 +22,8 @@ export const DATA_TAGS = {
 } as const;
 
 export function revalidateAppData(...tags: Array<keyof typeof DATA_TAGS>) {
-  for (const tag of tags) revalidateTag(DATA_TAGS[tag], "max");
-  revalidateTag(DATA_TAGS.dashboard, "max");
+  for (const tag of tags) revalidateTag(DATA_TAGS[tag], { expire: 0 });
+  revalidateTag(DATA_TAGS.dashboard, { expire: 0 });
 }
 
 type DashboardRawOrder = {

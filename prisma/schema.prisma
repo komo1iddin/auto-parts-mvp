@@ -237,3 +237,12 @@ model SupplierPayment {
   @@index([supplierId])
   @@map("supplier_payments")
 }
+
+model AppRealtimeEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tableName String   @map("table_name")
+  operation String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("app_realtime_events")
+}
