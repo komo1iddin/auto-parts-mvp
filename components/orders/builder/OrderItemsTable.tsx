@@ -46,6 +46,7 @@ export function OrderItemsTable({ items, isAdmin, suppliers, partQualityTypes, d
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="w-12 px-4 py-3 text-center text-xs font-semibold text-gray-600 whitespace-nowrap">№</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">Kod</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Nomi</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Turi</th>
@@ -62,6 +63,7 @@ export function OrderItemsTable({ items, isAdmin, suppliers, partQualityTypes, d
                 <OrderItemsTableRow
                   key={item.id ?? item.localId ?? `${item.partVariantId || item.partId || item.partCode}-${item.type}-${index}`}
                   item={item}
+                  rowNumber={index + 1}
                   isAdmin={isAdmin}
                   duplicate={duplicateCodes.has(`${item.partCode.trim().toLowerCase()}::${item.type}`)}
                   typeOptions={typeOptions}

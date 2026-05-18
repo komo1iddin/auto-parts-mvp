@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 interface OrderItemsTableRowProps {
   item: OrderItem;
+  rowNumber: number;
   isAdmin: boolean;
   duplicate: boolean;
   typeOptions: { value: string; label: string }[];
@@ -19,6 +20,7 @@ interface OrderItemsTableRowProps {
 
 export function OrderItemsTableRow({
   item,
+  rowNumber,
   isAdmin,
   duplicate,
   typeOptions,
@@ -32,6 +34,10 @@ export function OrderItemsTableRow({
 
   return (
     <tr className="border-b border-gray-50 hover:bg-gray-50/50">
+      <td className="px-4 py-2.5 text-center align-middle text-xs font-semibold text-gray-400 tabular-nums">
+        {rowNumber}
+      </td>
+
       <td className="px-4 py-2.5 align-middle whitespace-nowrap">
         <div className="flex items-center gap-1.5">
           <span className="text-sm text-gray-800">{item.partCode}</span>

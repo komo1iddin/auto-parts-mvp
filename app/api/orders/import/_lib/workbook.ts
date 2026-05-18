@@ -3,6 +3,14 @@ import type { ParsedOrderRow } from "./types";
 import { normalizeCode, normalizeHeader, text, toNumber, toQuantity } from "./normalization";
 import { HEADER_ALIASES, TYPE_ALIASES, type HeaderField } from "./workbook-aliases";
 
+const SUPPLIER_PRICE_COLUMNS = [
+  { header: "jac", label: "JAC", type: "original" },
+  { header: "brand", label: "Brand", type: "oem" },
+  { header: "af", label: "AF", type: "aftermarket" },
+] as const;
+
+type SupplierPriceColumn = (typeof SUPPLIER_PRICE_COLUMNS)[number];
+
 function headerMatches(header: string, alias: string) {
   const normalizedAlias = normalizeHeader(alias);
   return header === normalizedAlias || header.includes(normalizedAlias) || (header.length >= 3 && normalizedAlias.includes(header));
@@ -44,13 +52,43 @@ function buildColumnMap(headers: unknown[]) {
   return columnMap;
 }
 
+function buildSupplierPriceColumnMap(headers: unknown[]) {
+  const normalizedHeaders = headers.map(normalizeHeader);
+  return new Map(
+    SUPPLIER_PRICE_COLUMNS.flatMap((priceColumn) => {
+      const index = normalizedHeaders.findIndex((header) => header === priceColumn.header);
+      return index >= 0 ? [[priceColumn, index] as const] : [];
+    })
+  );
+}
+
 function getCell(row: unknown[], columnMap: Map<HeaderField, number>, field: HeaderField) {
   const index = columnMap.get(field);
   return index == null ? undefined : row[index];
 }
 
-function parseRow(row: unknown[], columnMap: Map<HeaderField, number>, index: number): ParsedOrderRow | null {
-  const partCode = normalizeCode(getCell(row, columnMap, "partCode"));
+function getSupplierPrice(
+  row: unknown[],
+  supplierPriceColumnMap: Map<SupplierPriceColumn, number>
+) {
+  for (const [priceColumn, columnIndex] of supplierPriceColumnMap) {
+    const price = toNumber(row[columnIndex]);
+    if (price != null) return { ...priceColumn, price };
+  }
+
+  return null;
+}
+
+function parseRow(
+  row: unknown[],
+  columnMap: Map<HeaderField, number>,
+  supplierPriceColumnMap: Map<SupplierPriceColumn, number>,
+  index: number,
+  inheritedPartName: string
+): ParsedOrderRow | null {
+  const rawPartName = text(getCell(row, columnMap, "partName")) || inheritedPartName;
+  const supplierPrice = getSupplierPrice(row, supplierPriceColumnMap);
+  const partCode = normalizeCode(getCell(row, columnMap, "partCode")) || (rawPartName && supplierPrice ? rawPartName : "");
   if (!partCode) return null;
 
   const lowerCode = partCode.toLowerCase();
@@ -59,14 +97,14 @@ function parseRow(row: unknown[], columnMap: Map<HeaderField, number>, index: nu
   return {
     rowKey: `${index}-${partCode}`,
     partCode,
-    partName: text(getCell(row, columnMap, "partName")),
+    partName: rawPartName,
     categoryName: text(getCell(row, columnMap, "categoryName")),
-    brand: text(getCell(row, columnMap, "brand")),
-    type: normalizeType(getCell(row, columnMap, "type")),
-    purchasePriceCny: toNumber(getCell(row, columnMap, "purchasePriceCny")),
+    brand: supplierPrice ? "" : text(getCell(row, columnMap, "brand")),
+    type: supplierPrice?.type ?? normalizeType(getCell(row, columnMap, "type")),
+    purchasePriceCny: supplierPrice?.price ?? toNumber(getCell(row, columnMap, "purchasePriceCny")),
     wholesalePriceCny: toNumber(getCell(row, columnMap, "wholesalePriceCny")),
     sellingPriceCny: toNumber(getCell(row, columnMap, "sellingPriceCny")),
-    supplierName: text(getCell(row, columnMap, "supplierName")),
+    supplierName: supplierPrice?.label ?? text(getCell(row, columnMap, "supplierName")),
     quantity: toQuantity(getCell(row, columnMap, "quantity")),
     note: text(getCell(row, columnMap, "note")),
   };
@@ -85,8 +123,14 @@ export function parseWorkbook(buffer: ArrayBuffer) {
   const columnMap = buildColumnMap(rows[headerIndex]);
   if (!columnMap.has("partCode")) return [];
 
-  return rows
-    .slice(headerIndex + 1)
-    .map((row, index) => parseRow(row, columnMap, index))
-    .filter(Boolean) as ParsedOrderRow[];
+  const supplierPriceColumnMap = buildSupplierPriceColumnMap(rows[headerIndex]);
+  let inheritedPartName = "";
+
+  return rows.slice(headerIndex + 1).flatMap((row, index) => {
+    const partName = text(getCell(row, columnMap, "partName"));
+    if (partName) inheritedPartName = partName;
+
+    const parsed = parseRow(row, columnMap, supplierPriceColumnMap, index, inheritedPartName);
+    return parsed ? [parsed] : [];
+  });
 }
