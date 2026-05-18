@@ -14,7 +14,16 @@ export function buildOrderNumber(base: string, seq: number, version: number): st
 
 export function formatCny(value: number | string | null | undefined): string {
   if (value == null) return "—";
-  return `¥${Number(value).toFixed(2)}`;
+  return `¥${formatNumber(Number(value), 2)}`;
+}
+
+export function formatNumber(value: number | string, fractionDigits = 0): string {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return String(value);
+  const fixed = number.toFixed(fractionDigits);
+  const [whole, fraction] = fixed.split(".");
+  const formattedWhole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return fractionDigits > 0 ? `${formattedWhole}.${fraction}` : formattedWhole;
 }
 
 export function cn(...classes: (string | undefined | false | null)[]): string {

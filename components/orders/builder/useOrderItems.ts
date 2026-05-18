@@ -83,6 +83,14 @@ export function useOrderItems(initialItems: OrderItem[]) {
     )));
   }
 
+  function updateAllSuppliers(supplierId: string, supplierName: string) {
+    setItems((current) => current.map((item) => ({
+      ...item,
+      supplierId,
+      supplierName,
+    })));
+  }
+
   function removeItem(partId: string) {
     const index = items.findIndex((item) => itemKey(item) === partId);
     const item = items[index];
@@ -111,6 +119,7 @@ export function useOrderItems(initialItems: OrderItem[]) {
     addImportedItems,
     updateQty,
     updateField,
+    updateAllSuppliers,
     removeItem,
     undoDelete,
   };

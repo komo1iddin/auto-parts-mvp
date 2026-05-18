@@ -123,6 +123,7 @@ export function useOrderBuilder({ existingOrder, redirectTo, ordersPath }: UseOr
     addImportedItems: orderItems.addImportedItems,
     updateQty: orderItems.updateQty,
     updateField: orderItems.updateField,
+    updateAllSuppliers: orderItems.updateAllSuppliers,
     removeItem: orderItems.removeItem,
     undoDelete: orderItems.undoDelete,
     status,

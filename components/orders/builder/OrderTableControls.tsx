@@ -10,11 +10,13 @@ export function TableSelect({
   onChange,
   options,
   width,
+  menuWidth,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
   width: number;
+  menuWidth?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ left: 0, top: 0, width });
@@ -31,7 +33,7 @@ export function TableSelect({
       setPosition({
         left: rect.left,
         top: rect.bottom + 8,
-        width: Math.max(rect.width, 160),
+        width: menuWidth ?? Math.max(rect.width, 160),
       });
     };
     const onPointerDown = (event: PointerEvent) => {
@@ -49,7 +51,7 @@ export function TableSelect({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [open, width]);
+  }, [menuWidth, open, width]);
 
   return (
     <div ref={rootRef} className="relative" style={{ width }}>
@@ -116,6 +118,7 @@ export function TableInput({
   return (
     <input
       type="number"
+      data-table-input="true"
       min={0}
       step={step}
       value={draft}
@@ -130,6 +133,14 @@ export function TableInput({
       onBlur={() => {
         setFocused(false);
         setDraft(String(value));
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        const inputs = Array.from(document.querySelectorAll<HTMLInputElement>("input[data-table-input='true']"));
+        const nextInput = inputs[inputs.indexOf(event.currentTarget) + 1];
+        nextInput?.focus();
+        nextInput?.select();
       }}
       placeholder={placeholder ?? "0"}
       className={cn(

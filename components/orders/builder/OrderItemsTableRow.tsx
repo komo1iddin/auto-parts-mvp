@@ -63,6 +63,7 @@ export function OrderItemsTableRow({
             onChange={(value) => updateField(rowKey, "type", value)}
             options={typeOptions}
             width={112}
+            menuWidth={128}
           />
         </div>
       </td>

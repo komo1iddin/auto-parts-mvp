@@ -2,7 +2,7 @@
 
 import { ArrowLeft, X, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { formatCny } from "@/lib/utils";
+import { formatCny, formatNumber } from "@/lib/utils";
 
 interface OrderItem {
   partId: string;
@@ -84,11 +84,11 @@ export function OrderBuilderBar({
           <div className="flex items-center gap-6 text-sm text-gray-600">
             <span>
               <span className="text-gray-400">Qismlar:</span>{" "}
-              <strong>{itemCount}</strong>
+              <strong>{formatNumber(itemCount)}</strong>
             </span>
             <span>
               <span className="text-gray-400">Miqdor:</span>{" "}
-              <strong>{totalQty}</strong>
+              <strong>{formatNumber(totalQty)}</strong>
             </span>
             {isAdmin && (
               <span>
@@ -111,15 +111,15 @@ export function OrderBuilderBar({
           </div>
           <div className="flex items-center gap-3">
             {isEdit && (
-              <Button variant="outline" onClick={onBackToOrders}>
-                <ArrowLeft className="size-4" />
-                Buyurtmalar
-              </Button>
+            <Button variant="outline" onClick={onBackToOrders} className="hover:border-gray-400 hover:bg-gray-100">
+              <ArrowLeft className="size-4" />
+              Buyurtmalar
+            </Button>
             )}
-            <Button variant="secondary" onClick={onCancel}>
+            <Button variant="secondary" onClick={onCancel} className="hover:bg-gray-200 hover:text-gray-950">
               Bekor qilish
             </Button>
-            <Button onClick={onSave} disabled={saving || itemCount === 0}>
+            <Button onClick={onSave} disabled={saving || itemCount === 0} className="hover:bg-gray-800">
               {saving ? "Saqlanmoqda..." : isEdit ? "Yangilash" : "Buyurtma yaratish"}
             </Button>
           </div>

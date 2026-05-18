@@ -45,6 +45,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = 
         duplicateCodes={builder.duplicateCodes}
         updateField={builder.updateField}
         updateQty={builder.updateQty}
+        updateAllSuppliers={builder.updateAllSuppliers}
         onDelete={builder.setDeleteTarget}
       />
 
