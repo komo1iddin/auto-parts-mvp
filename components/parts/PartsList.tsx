@@ -67,6 +67,40 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
     startTransition(() => router.refresh());
   }
 
+  async function addAlias(part: Part) {
+    const code = prompt(`"${part.code}" uchun alternativ part number kiriting`);
+    if (!code?.trim()) return;
+
+    let response = await fetch(`/api/parts/${part.id}/aliases`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    let data = await response.json().catch(() => ({}));
+
+    if (response.status === 409 && data.duplicatePart) {
+      const merge = confirm(
+        `"${code}" kodi "${data.duplicatePart.code}" zapchasti sifatida mavjud.\n\n` +
+        `Agar bu "${part.code}" bilan bitta zapchast bo'lsa, birlashtiraymi?`
+      );
+      if (!merge) return;
+
+      response = await fetch(`/api/parts/${part.id}/aliases`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, mergeExisting: true }),
+      });
+      data = await response.json().catch(() => ({}));
+    }
+
+    if (!response.ok) {
+      alert(data.error ?? "Alias qo'shishda xatolik yuz berdi");
+      return;
+    }
+
+    startTransition(() => router.refresh());
+  }
+
   function handleCreateSuccess() {
     setCreateOpen(false);
     updateParams({ page: null });
@@ -102,6 +136,7 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
           isPending={isPending}
           onView={setViewPart}
           onEdit={setEditPart}
+          onAlias={addAlias}
           onDelete={deletePart}
         />
         <PartsPagination

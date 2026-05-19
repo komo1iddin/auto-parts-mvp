@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, getAuthUser, forbidden } from "@/lib/auth";
 import { revalidateAppData } from "@/lib/data";
+import { buildSupplierPricesFromBody, replaceVariantSupplierPrices } from "@/lib/part-supplier-prices";
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "";
@@ -22,10 +23,14 @@ export async function GET(
 
   const part = await prisma.partVariant.findUnique({
     where: { id },
-    include: { part: { include: { category: true } }, supplier: true },
+    include: {
+      part: { include: { category: true } },
+      supplierPrices: { include: { supplier: true }, orderBy: [{ purchasePriceCny: "asc" }, { createdAt: "asc" }] },
+    },
   });
 
   if (!part) return Response.json({ error: "Topilmadi" }, { status: 404 });
+  const bestSupplierPrice = part.supplierPrices?.[0] ?? null;
 
   return Response.json({
     part: {
@@ -34,9 +39,11 @@ export async function GET(
       name: part.part.name,
       categoryId: part.part.categoryId,
       category: part.part.category,
-      purchasePriceCny: isAdmin ? part.purchasePriceCny : undefined,
-      wholesalePriceCny: isAdmin ? part.wholesalePriceCny : undefined,
-      supplier: isAdmin ? part.supplier : undefined,
+      bestSupplierPrice: isAdmin ? bestSupplierPrice : undefined,
+      purchasePriceCny: isAdmin ? bestSupplierPrice?.purchasePriceCny : undefined,
+      wholesalePriceCny: isAdmin ? bestSupplierPrice?.wholesalePriceCny : undefined,
+      supplier: isAdmin ? bestSupplierPrice?.supplier : undefined,
+      supplierPrices: isAdmin ? part.supplierPrices : undefined,
       note: isAdmin ? part.note : undefined,
     },
   });
@@ -56,8 +63,8 @@ export async function PUT(
   const body = await req.json();
   const {
     code, name, categoryId, brand, type,
-    purchasePriceCny, wholesalePriceCny, sellingPriceCny,
-    supplierId, imageUrl, note,
+    sellingPriceCny,
+    imageUrl, note,
   } = body;
 
   if (!code?.trim()) return Response.json({ error: "Qism kodi majburiy" }, { status: 400 });
@@ -80,21 +87,24 @@ export async function PUT(
         },
       });
 
-      return tx.partVariant.update({
+      const duplicate = (await tx.partVariant.findMany({ where: { partId: family.id, type: type || "original" } }))
+        .find((variant: { id: string; brand?: string | null }) => variant.id !== id && (variant.brand ?? "") === (brand?.trim() || ""));
+      if (duplicate) throw new Error("Unique constraint");
+
+      await tx.partVariant.update({
         where: { id },
         data: {
           partId: family.id,
           brand: brand?.trim() || null,
           type: type || "original",
-          purchasePriceCny: purchasePriceCny != null ? Number(purchasePriceCny) : null,
-          wholesalePriceCny: wholesalePriceCny != null ? Number(wholesalePriceCny) : null,
           sellingPriceCny: sellingPriceCny != null ? Number(sellingPriceCny) : null,
-          supplierId: supplierId || null,
           imageUrl: imageUrl || null,
           note: note?.trim() || null,
         },
-        include: { part: { include: { category: true } }, supplier: true },
+        include: { part: { include: { category: true } } },
       });
+
+      return replaceVariantSupplierPrices(id, buildSupplierPricesFromBody(body));
     });
     revalidateAppData("parts");
     return Response.json({ part });

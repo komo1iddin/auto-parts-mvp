@@ -14,10 +14,23 @@ export function buildInitialPartForm(defaultValues?: PartFormDefaultValues): Par
     categoryId: defaultValues?.categoryId ?? "",
     brand: defaultValues?.brand ?? "",
     type: defaultValues?.type ?? "original",
-    purchasePriceCny: defaultValues?.purchasePriceCny ?? "",
-    wholesalePriceCny: defaultValues?.wholesalePriceCny ?? "",
     sellingPriceCny: defaultValues?.sellingPriceCny ?? "",
-    supplierId: defaultValues?.supplierId ?? "",
+    supplierPrices: defaultValues?.supplierPrices?.length
+      ? defaultValues.supplierPrices.map((price) => ({
+          id: price.id,
+          supplierId: price.supplierId,
+          purchasePriceCny: price.purchasePriceCny?.toString() ?? "",
+          wholesalePriceCny: price.wholesalePriceCny?.toString() ?? "",
+          note: price.note ?? "",
+        }))
+      : [
+          {
+            supplierId: defaultValues?.supplierId ?? "",
+            purchasePriceCny: defaultValues?.purchasePriceCny ?? "",
+            wholesalePriceCny: defaultValues?.wholesalePriceCny ?? "",
+            note: "",
+          },
+        ],
     note: defaultValues?.note ?? "",
     imageUrl: defaultValues?.imageUrl ?? "",
   };
@@ -26,10 +39,15 @@ export function buildInitialPartForm(defaultValues?: PartFormDefaultValues): Par
 export function toPartPayload(form: PartFormData) {
   return {
     ...form,
-    purchasePriceCny: form.purchasePriceCny ? Number(form.purchasePriceCny) : null,
-    wholesalePriceCny: form.wholesalePriceCny ? Number(form.wholesalePriceCny) : null,
     sellingPriceCny: form.sellingPriceCny ? Number(form.sellingPriceCny) : null,
     categoryId: form.categoryId || null,
-    supplierId: form.supplierId || null,
+    supplierPrices: form.supplierPrices
+      .filter((price) => price.supplierId && price.purchasePriceCny)
+      .map((price) => ({
+        ...price,
+        purchasePriceCny: Number(price.purchasePriceCny),
+        wholesalePriceCny: price.wholesalePriceCny ? Number(price.wholesalePriceCny) : null,
+        note: price.note || null,
+      })),
   };
 }

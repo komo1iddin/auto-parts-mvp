@@ -10,7 +10,10 @@ export default async function EditPartPage({
   const { id } = await params;
   const part = await prisma.partVariant.findUnique({
     where: { id },
-    include: { part: true },
+    include: {
+      part: true,
+      supplierPrices: { include: { supplier: true }, orderBy: [{ purchasePriceCny: "asc" }, { createdAt: "asc" }] },
+    },
   });
   if (!part) notFound();
 
@@ -29,10 +32,8 @@ export default async function EditPartPage({
             categoryId: part.part.categoryId ?? "",
             brand: part.brand ?? "",
             type: part.type,
-            purchasePriceCny: part.purchasePriceCny?.toString() ?? "",
-            wholesalePriceCny: part.wholesalePriceCny?.toString() ?? "",
             sellingPriceCny: part.sellingPriceCny?.toString() ?? "",
-            supplierId: part.supplierId ?? "",
+            supplierPrices: part.supplierPrices ?? [],
             imageUrl: part.imageUrl ?? "",
             note: part.note ?? "",
           }}

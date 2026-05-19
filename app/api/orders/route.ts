@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminOrManager, unauthorized } from "@/lib/auth";
 import { getOrdersList, revalidateAppData } from "@/lib/data";
 import { generateOrderNumber, buildOrderNumber, isEditableOrderStatus } from "@/lib/utils";
+import { attachCatalogToOrderItems } from "@/lib/order-catalog";
 
 export async function GET(req: NextRequest) {
   let user;
@@ -80,6 +81,7 @@ export async function POST(req: NextRequest) {
   });
   const seq = todayCount + 1;
   const orderNumber = buildOrderNumber(base, seq, 1);
+  const catalogItems = await attachCatalogToOrderItems(items);
 
   const order = await prisma.order.create({
     data: {
@@ -91,24 +93,10 @@ export async function POST(req: NextRequest) {
       createdBy: user.id,
       updatedBy: user.id,
       items: {
-        create: items.map((item: {
-          partId?: string;
-          partVariantId?: string;
-          partCode: string;
-          partName?: string;
-          categoryName?: string;
-          brand?: string;
-          type?: string;
-          purchasePriceCny?: number;
-          wholesalePriceCny?: number;
-          sellingPriceCny?: number;
-          supplierId?: string;
-          supplierName?: string;
-          quantity: number;
-          note?: string;
-        }) => ({
+        create: catalogItems.map((item) => ({
           partId: item.partId || null,
           partVariantId: item.partVariantId || null,
+          partSupplierPriceId: item.partSupplierPriceId || null,
           partCode: item.partCode,
           partName: item.partName || null,
           categoryName: item.categoryName || null,

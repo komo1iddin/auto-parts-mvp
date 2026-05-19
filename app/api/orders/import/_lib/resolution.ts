@@ -1,5 +1,5 @@
 import type { ImportResolution, ParsedOrderRow, PartWithRelations, TypeOption } from "./types";
-import { findPriceMatchedPart, partKey } from "./catalog";
+import { findCatalogPartForRow, findPriceMatchedPart, partKey } from "./catalog";
 import { normalizeKey } from "./normalization";
 
 export function applyResolutions(rows: ParsedOrderRow[], resolutions: ImportResolution[]) {
@@ -34,14 +34,17 @@ export function getResolutionIssues(
   rows: ParsedOrderRow[],
   partsByKey: Map<string, PartWithRelations>,
   partsByCode: Map<string, PartWithRelations[]>,
-  typeOptions: TypeOption[]
+  typeOptions: TypeOption[],
+  partsByAlias = new Map<string, PartWithRelations[]>(),
+  partsByName = new Map<string, PartWithRelations[]>()
 ) {
   return rows.flatMap((row) => {
     const hasValidType = row.type && isValidType(row.type, typeOptions);
     const exactPart = hasValidType ? partsByKey.get(partKey(row.partCode, row.type, row.brand)) : undefined;
     if (exactPart) return [];
 
-    const matchingParts = partsByCode.get(normalizeKey(row.partCode)) ?? [];
+    const catalogPart = findCatalogPartForRow(row, partsByKey, partsByCode, partsByAlias, partsByName);
+    const matchingParts = catalogPart ? [catalogPart] : (partsByCode.get(normalizeKey(row.partCode)) ?? []);
     const priceMatchedPart = findPriceMatchedPart(row, matchingParts);
     const existingTypes = matchingParts.map((part) => part.type).filter(Boolean);
     const existingPart = priceMatchedPart ?? matchingParts[0];
@@ -53,7 +56,9 @@ export function getResolutionIssues(
       partName: row.partName || existingPart?.name || "",
       quantity: row.quantity,
       price: row.purchasePriceCny,
-      purchasePriceCny: existingPart?.purchasePriceCny != null ? Number(existingPart.purchasePriceCny) : row.purchasePriceCny,
+      purchasePriceCny: existingPart?.supplierPrices?.[0]?.purchasePriceCny != null
+        ? Number(existingPart.supplierPrices[0].purchasePriceCny)
+        : row.purchasePriceCny,
       sellingPriceCny: row.sellingPriceCny ?? row.purchasePriceCny ?? (existingPart?.sellingPriceCny != null ? Number(existingPart.sellingPriceCny) : null),
       existingType: existingPart?.type ?? "",
       existingTypes,

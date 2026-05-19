@@ -16,6 +16,14 @@ type ImportSummary = {
   createdCodes: string[];
 };
 
+type ImportWarning = {
+  rowKey: string;
+  partCode: string;
+  partName: string;
+  message: string;
+  suggestedAction: string;
+};
+
 type ImportRow = {
   rowKey: string;
   partCode: string;
@@ -47,6 +55,7 @@ type PendingResolution = {
   rows: ImportRow[];
   issues: ImportIssue[];
   typeOptions: TypeOption[];
+  warnings?: ImportWarning[];
 };
 
 interface OrderExcelImportProps {
@@ -61,6 +70,7 @@ export function OrderExcelImport({ onImportItems, suppliers = [] }: OrderExcelIm
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState("");
   const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [warnings, setWarnings] = useState<ImportWarning[]>([]);
   const [pendingResolution, setPendingResolution] = useState<PendingResolution | null>(null);
   const [resolutionTypes, setResolutionTypes] = useState<Record<string, string>>({});
   const [resolutionPrices, setResolutionPrices] = useState<Record<string, { purchasePriceCny: string; sellingPriceCny: string }>>({});
@@ -75,7 +85,7 @@ export function OrderExcelImport({ onImportItems, suppliers = [] }: OrderExcelIm
     setBulkSupplierId("");
   }
 
-  function completeImport(data: { items?: OrderItem[]; summary?: ImportSummary }, capturedResolution: PendingResolution | null) {
+  function completeImport(data: { items?: OrderItem[]; summary?: ImportSummary; warnings?: ImportWarning[] }, capturedResolution: PendingResolution | null) {
     let items = data.items ?? [];
 
     if (Object.keys(resolutionSupplierIds).length > 0 || bulkSupplierId) {
@@ -91,12 +101,14 @@ export function OrderExcelImport({ onImportItems, suppliers = [] }: OrderExcelIm
 
     onImportItems(items);
     setSummary(data.summary ?? null);
+    setWarnings(data.warnings ?? []);
     resetResolution();
     if (inputRef.current) inputRef.current.value = "";
   }
 
   function openResolution(data: PendingResolution) {
     setPendingResolution(data);
+    setWarnings(data.warnings ?? []);
     setResolutionTypes((current) => {
       const next: Record<string, string> = {};
       for (const issue of data.issues) {
@@ -149,6 +161,7 @@ export function OrderExcelImport({ onImportItems, suppliers = [] }: OrderExcelIm
     setUploading(true);
     setError("");
     setSummary(null);
+    setWarnings([]);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -243,7 +256,7 @@ export function OrderExcelImport({ onImportItems, suppliers = [] }: OrderExcelIm
         <div>
           <h2 className="font-semibold text-gray-800">Excel import</h2>
           <p className="mt-0.5 text-xs text-gray-500">
-            Part number katalogdan tekshiriladi, yangilari avtomatik qo'shiladi.
+            Part number katalogdan tekshiriladi. Yangi zapchastlar buyurtma saqlanganda katalogga qo'shiladi.
           </p>
         </div>
         <Button
@@ -299,7 +312,19 @@ export function OrderExcelImport({ onImportItems, suppliers = [] }: OrderExcelIm
       {summary && (
         <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
           {summary.parsedCount} qator import qilindi. Katalogda bor: {summary.existingCount}. Yangi qo'shildi:{" "}
-          {summary.createdCount}.
+          {summary.createdCount} ta saqlashga tayyor.
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {warnings.slice(0, 5).map((warning) => (
+            <div key={warning.rowKey}>
+              <div className="font-medium">{warning.message}</div>
+              <div className="text-amber-800">{warning.suggestedAction}</div>
+            </div>
+          ))}
+          {warnings.length > 5 && <div>Yana {warnings.length - 5} ta ogohlantirish bor.</div>}
         </div>
       )}
 

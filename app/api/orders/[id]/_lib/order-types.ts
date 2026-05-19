@@ -7,6 +7,7 @@ export type IncomingOrderItem = {
   id?: string;
   partId?: string;
   partVariantId?: string;
+  partSupplierPriceId?: string;
   partCode: string;
   partName?: string;
   categoryName?: string;

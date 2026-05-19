@@ -1,36 +1,40 @@
 import type { ParsedOrderRow, PartWithRelations } from "./types";
 import { partKey } from "./catalog";
 
+function bestSupplierPrice(part?: PartWithRelations | null) {
+  return part?.supplierPrices?.[0] ?? null;
+}
+
 export function buildImportedItems(
   rows: ParsedOrderRow[],
   partsByKey: Map<string, PartWithRelations>,
-  partByRowKey: Map<string, PartWithRelations>,
-  createdVariantKeys: Set<string>
+  partByRowKey: Map<string, PartWithRelations>
 ) {
   const importedAt = Date.now();
 
   return rows.map((row, index) => {
     const key = partKey(row.partCode, row.type, row.brand);
     const part = partByRowKey.get(row.rowKey) ?? partsByKey.get(key);
-    const isCreatedVariant = createdVariantKeys.has(row.rowKey);
-    const catalogPurchasePrice = part?.purchasePriceCny != null ? Number(part.purchasePriceCny) : null;
-    const catalogWholesalePrice = part?.wholesalePriceCny != null ? Number(part.wholesalePriceCny) : null;
+    const offer = bestSupplierPrice(part);
+    const catalogPurchasePrice = offer?.purchasePriceCny != null ? Number(offer.purchasePriceCny) : null;
+    const catalogWholesalePrice = offer?.wholesalePriceCny != null ? Number(offer.wholesalePriceCny) : null;
     const excelSellingPrice = row.sellingPriceCny ?? row.purchasePriceCny;
 
     return {
       localId: `import-${importedAt}-${index}`,
       partId: part?.partId ?? "",
       partVariantId: part?.id ?? "",
+      partSupplierPriceId: offer?.id ?? "",
       partCode: part?.code ?? row.partCode,
       partName: row.partName || part?.name || "",
       categoryName: row.categoryName || part?.category?.name || "",
       brand: row.brand || part?.brand || "",
       type: row.type,
-      purchasePriceCny: isCreatedVariant ? row.purchasePriceCny ?? catalogPurchasePrice : catalogPurchasePrice ?? row.purchasePriceCny,
-      wholesalePriceCny: isCreatedVariant ? row.wholesalePriceCny ?? catalogWholesalePrice : catalogWholesalePrice ?? row.wholesalePriceCny,
+      purchasePriceCny: catalogPurchasePrice ?? row.purchasePriceCny,
+      wholesalePriceCny: catalogWholesalePrice ?? row.wholesalePriceCny,
       sellingPriceCny: excelSellingPrice,
-      supplierId: part?.supplierId ?? "",
-      supplierName: row.supplierName || part?.supplier?.name || "",
+      supplierId: offer?.supplierId ?? "",
+      supplierName: offer?.supplier?.name || "",
       quantity: row.quantity,
       note: row.note,
     };

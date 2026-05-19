@@ -46,7 +46,7 @@ model Supplier {
   note      String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  partVariants PartVariant[]
+  partSupplierPrices PartSupplierPrice[]
   exports  OrderExport[]
   payments SupplierPayment[]
 
@@ -88,33 +88,63 @@ model Part {
 
   category   Category?   @relation(fields: [categoryId], references: [id])
   variants   PartVariant[]
+  codeAliases PartCodeAlias[]
   orderItems OrderItem[]
 
   @@map("parts")
 }
 
+model PartCodeAlias {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partId         String   @map("part_id") @db.Uuid
+  code           String   @unique
+  normalizedCode String   @unique @map("normalized_code")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  part Part @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  @@index([partId])
+  @@map("part_code_aliases")
+}
+
 model PartVariant {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partId          String   @map("part_id") @db.Uuid
+  brand           String?
+  type            String   @default("original")
+  sellingPriceCny Decimal? @map("selling_price_cny") @db.Decimal(12, 2)
+  imageUrl        String?  @map("image_url")
+  note            String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  part       Part        @relation(fields: [partId], references: [id], onDelete: Cascade)
+  supplierPrices PartSupplierPrice[]
+  orderItems OrderItem[]
+
+  @@unique([partId, brand, type])
+  @@index([partId])
+  @@map("part_variants")
+}
+
+model PartSupplierPrice {
   id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  partId            String   @map("part_id") @db.Uuid
-  brand             String?
-  type              String   @default("original")
-  purchasePriceCny  Decimal? @map("purchase_price_cny") @db.Decimal(12, 2)
+  partVariantId     String   @map("part_variant_id") @db.Uuid
+  supplierId        String   @map("supplier_id") @db.Uuid
+  purchasePriceCny  Decimal  @map("purchase_price_cny") @db.Decimal(12, 2)
   wholesalePriceCny Decimal? @map("wholesale_price_cny") @db.Decimal(12, 2)
-  sellingPriceCny   Decimal? @map("selling_price_cny") @db.Decimal(12, 2)
-  supplierId        String?  @map("supplier_id") @db.Uuid
-  imageUrl          String?  @map("image_url")
   note              String?
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
 
-  part       Part        @relation(fields: [partId], references: [id], onDelete: Cascade)
-  supplier   Supplier?   @relation(fields: [supplierId], references: [id])
-  orderItems OrderItem[]
+  partVariant PartVariant @relation(fields: [partVariantId], references: [id], onDelete: Cascade)
+  supplier    Supplier    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
 
-  @@unique([partId, brand, type, supplierId])
-  @@index([partId])
+  @@unique([partVariantId, supplierId])
+  @@index([partVariantId])
   @@index([supplierId])
-  @@map("part_variants")
+  @@map("part_supplier_prices")
 }
 
 model Order {
@@ -147,6 +177,7 @@ model OrderItem {
   orderId           String   @map("order_id") @db.Uuid
   partId            String?  @map("part_id") @db.Uuid
   partVariantId     String?  @map("part_variant_id") @db.Uuid
+  partSupplierPriceId String? @map("part_supplier_price_id") @db.Uuid
   partCode          String   @map("part_code")
   partName          String?  @map("part_name")
   categoryName      String?  @map("category_name")
@@ -163,8 +194,10 @@ model OrderItem {
   order Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
   part  Part?  @relation(fields: [partId], references: [id])
   partVariant PartVariant? @relation(fields: [partVariantId], references: [id])
+  partSupplierPrice PartSupplierPrice? @relation(fields: [partSupplierPriceId], references: [id])
 
   @@index([partVariantId])
+  @@index([partSupplierPriceId])
   @@map("order_items")
 }
 

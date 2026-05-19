@@ -33,20 +33,22 @@ export function buildOrderChangelog(originalItems: OrderItem[], items: OrderItem
 }
 
 export function buildOrderItem(part: PartSearchResult): OrderItem {
+  const bestSupplierPrice = part.bestSupplierPrice ?? null;
   return {
     localId: `part-${part.id}`,
     partId: part.partId,
     partVariantId: part.id,
+    partSupplierPriceId: bestSupplierPrice?.id,
     partCode: part.code,
     partName: part.name ?? "",
     categoryName: part.category?.name ?? "",
     brand: part.brand ?? "",
     type: part.type,
     sellingPriceCny: part.sellingPriceCny ? Number(part.sellingPriceCny) : null,
-    purchasePriceCny: part.purchasePriceCny ? Number(part.purchasePriceCny) : null,
-    wholesalePriceCny: part.wholesalePriceCny ? Number(part.wholesalePriceCny) : null,
-    supplierId: part.supplier?.id ?? "",
-    supplierName: part.supplier?.name ?? "",
+    purchasePriceCny: bestSupplierPrice?.purchasePriceCny != null ? Number(bestSupplierPrice.purchasePriceCny) : null,
+    wholesalePriceCny: bestSupplierPrice?.wholesalePriceCny != null ? Number(bestSupplierPrice.wholesalePriceCny) : null,
+    supplierId: bestSupplierPrice?.supplierId ?? "",
+    supplierName: bestSupplierPrice?.supplier?.name ?? "",
     quantity: 1,
     note: "",
   };

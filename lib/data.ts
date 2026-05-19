@@ -359,37 +359,44 @@ export const getPartsList = unstable_cache(
             }
           : {},
         categoryId ? { part: { categoryId } } : {},
-        supplierId ? { supplierId } : {},
         brand ? { brand: { contains: brand, mode: "insensitive" as const } } : {},
       ],
     };
 
-    const [variants, total] = await Promise.all([
-      prisma.partVariant.findMany({
-        where,
-        include: { part: { include: { category: true } }, supplier: true },
-        orderBy: { createdAt: "desc" },
-        take,
-        skip,
-      }),
-      prisma.partVariant.count({ where }),
-    ]);
+    const variants = await prisma.partVariant.findMany({
+      where,
+      include: {
+        part: { include: { category: true } },
+        supplierPrices: { include: { supplier: true }, orderBy: [{ purchasePriceCny: "asc" }, { createdAt: "asc" }] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const filtered = supplierId
+      ? variants.filter((variant) => variant.supplierPrices?.some((price: { supplierId: string }) => price.supplierId === supplierId))
+      : variants;
+    const paged = filtered.slice(skip, skip + take);
 
     const isAdmin = role === "admin";
-    const sanitized = variants.map((variant) => ({
-      ...variant,
-      partId: variant.partId,
-      code: variant.part.code,
-      name: variant.part.name,
-      categoryId: variant.part.categoryId,
-      category: variant.part.category,
-      purchasePriceCny: isAdmin ? variant.purchasePriceCny : undefined,
-      wholesalePriceCny: isAdmin ? variant.wholesalePriceCny : undefined,
-      supplier: isAdmin ? variant.supplier : undefined,
-      note: isAdmin ? variant.note : undefined,
-    }));
+    const sanitized = paged.map((variant) => {
+      const bestSupplierPrice = variant.supplierPrices?.[0] ?? null;
+      return {
+        ...variant,
+        partId: variant.partId,
+        code: variant.part.code,
+        name: variant.part.name,
+        categoryId: variant.part.categoryId,
+        category: variant.part.category,
+        bestSupplierPrice: isAdmin ? bestSupplierPrice : undefined,
+        supplierPrices: isAdmin ? variant.supplierPrices : undefined,
+        purchasePriceCny: isAdmin ? bestSupplierPrice?.purchasePriceCny : undefined,
+        wholesalePriceCny: isAdmin ? bestSupplierPrice?.wholesalePriceCny : undefined,
+        supplier: isAdmin ? bestSupplierPrice?.supplier : undefined,
+        note: isAdmin ? variant.note : undefined,
+      };
+    });
 
-    return { parts: sanitized, total };
+    return { parts: sanitized, total: filtered.length };
   },
   ["parts-list"],
   {

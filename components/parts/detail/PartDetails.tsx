@@ -8,6 +8,13 @@ export interface PartDetailsData {
   purchasePriceCny?: string | number | { toString(): string } | null;
   wholesalePriceCny?: string | number | { toString(): string } | null;
   sellingPriceCny?: string | number | { toString(): string } | null;
+  supplierPrices?: Array<{
+    id: string;
+    purchasePriceCny: string | number | { toString(): string };
+    wholesalePriceCny?: string | number | { toString(): string } | null;
+    note?: string | null;
+    supplier?: { name: string } | null;
+  }>;
   imageUrl: string | null;
   note?: string | null;
   category?: { name: string } | null;
@@ -32,10 +39,29 @@ export function PartDetails({
         <DetailItem label="Brend" value={part.brand} />
         <DetailItem label="Quality" value={PART_TYPES[part.type] ?? part.type} />
         <DetailItem label="Sotuv narxi" value={formatCny(part.sellingPriceCny?.toString())} />
-        {isAdmin && <DetailItem label="Xarid narxi" value={formatCny(part.purchasePriceCny?.toString())} />}
-        {isAdmin && <DetailItem label="Ulgurji narx" value={formatCny(part.wholesalePriceCny?.toString())} />}
-        {isAdmin && <DetailItem label="Ta'minotchi" value={part.supplier?.name} />}
       </div>
+
+      {isAdmin && (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Ta'minotchi narxlari</p>
+          <div className="mt-2 overflow-hidden rounded-md border border-gray-100">
+            {(part.supplierPrices ?? []).map((price, index) => (
+              <div key={price.id} className="grid grid-cols-1 gap-2 border-b border-gray-100 px-3 py-2 text-sm last:border-b-0 sm:grid-cols-4">
+                <span className="font-medium text-gray-800">
+                  {price.supplier?.name ?? "—"}
+                  {index === 0 && <span className="ml-2 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700">eng arzon</span>}
+                </span>
+                <span className="text-gray-700">Xarid: {formatCny(price.purchasePriceCny?.toString())}</span>
+                <span className="text-gray-700">Ulgurji: {formatCny(price.wholesalePriceCny?.toString())}</span>
+                <span className="text-gray-500">{price.note || ""}</span>
+              </div>
+            ))}
+            {!part.supplierPrices?.length && (
+              <div className="px-3 py-3 text-sm text-gray-400">Narx kiritilmagan</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {part.imageUrl && (
         <div>

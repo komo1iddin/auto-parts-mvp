@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidateAppData } from "@/lib/data";
 import { isEditableOrderStatus } from "@/lib/utils";
+import { attachCatalogToOrderItems } from "@/lib/order-catalog";
 import { buildReplacementItems } from "./order-items";
 import { canAccessOrder } from "./order-access";
 import type { ExistingOrderItem, IncomingOrderItem, OrderRouteUser } from "./order-types";
@@ -53,7 +54,8 @@ async function replaceOrderItemsAndVersion(
 ) {
   const newVersion = existing.version + 1;
   const newOrderNumber = `${existing.baseOrderNumber}-V${newVersion}`;
-  const replacementItems = buildReplacementItems(body.items ?? [], existing.items);
+  const catalogItems = await attachCatalogToOrderItems(body.items ?? []);
+  const replacementItems = buildReplacementItems(catalogItems, existing.items);
   const createdItemIds: string[] = [];
 
   try {

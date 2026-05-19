@@ -9,6 +9,7 @@ interface PartsTableProps {
   isPending: boolean;
   onView: (part: Part) => void;
   onEdit: (part: Part) => void;
+  onAlias: (part: Part) => void;
   onDelete: (part: Part) => void;
 }
 
@@ -19,6 +20,7 @@ export function PartsTable({
   isPending,
   onView,
   onEdit,
+  onAlias,
   onDelete,
 }: PartsTableProps) {
   return (
@@ -49,6 +51,7 @@ export function PartsTable({
               isAdmin={isAdmin}
               onView={onView}
               onEdit={onEdit}
+              onAlias={onAlias}
               onDelete={onDelete}
             />
           ))}
@@ -73,12 +76,14 @@ function PartsTableRow({
   isAdmin,
   onView,
   onEdit,
+  onAlias,
   onDelete,
 }: {
   part: Part;
   isAdmin: boolean;
   onView: (part: Part) => void;
   onEdit: (part: Part) => void;
+  onAlias: (part: Part) => void;
   onDelete: (part: Part) => void;
 }) {
   return (
@@ -114,6 +119,9 @@ function PartsTableRow({
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={() => onEdit(part)}>
               Tahrirlash
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => onAlias(part)}>
+              Alias
             </Button>
             <Button
               variant="ghost"

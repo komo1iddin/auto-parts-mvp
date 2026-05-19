@@ -48,6 +48,7 @@ export function buildReplacementItems(items: IncomingOrderItem[], existingItems:
     return {
       partId: item.partId || previous?.partId || null,
       partVariantId: item.partVariantId || previous?.partVariantId || null,
+      partSupplierPriceId: item.partSupplierPriceId || previous?.partSupplierPriceId || null,
       partCode: item.partCode,
       partName: item.partName || previous?.partName || null,
       categoryName: item.categoryName || previous?.categoryName || null,

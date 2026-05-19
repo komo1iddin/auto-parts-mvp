@@ -24,6 +24,13 @@ export interface PartSearchResult {
   sellingPriceCny: string | null;
   purchasePriceCny?: string | null;
   wholesalePriceCny?: string | null;
+  bestSupplierPrice?: {
+    id: string;
+    supplierId: string;
+    purchasePriceCny: string | number;
+    wholesalePriceCny?: string | number | null;
+    supplier?: { id: string; name: string } | null;
+  } | null;
   category?: { name: string } | null;
   supplier?: { id: string; name: string } | null;
 }
@@ -33,6 +40,7 @@ export interface OrderItem {
   localId?: string;
   partId: string;
   partVariantId?: string;
+  partSupplierPriceId?: string;
   partCode: string;
   partName: string;
   categoryName: string;

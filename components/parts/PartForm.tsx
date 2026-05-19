@@ -34,10 +34,8 @@ export function PartForm({ defaultValues, mode, onSuccess, onCancel, className }
   const defaultCategoryId = defaultValues?.categoryId;
   const defaultBrand = defaultValues?.brand;
   const defaultType = defaultValues?.type;
-  const defaultPurchasePriceCny = defaultValues?.purchasePriceCny;
-  const defaultWholesalePriceCny = defaultValues?.wholesalePriceCny;
   const defaultSellingPriceCny = defaultValues?.sellingPriceCny;
-  const defaultSupplierId = defaultValues?.supplierId;
+  const defaultSupplierPrices = defaultValues?.supplierPrices;
   const defaultNote = defaultValues?.note;
   const defaultImageUrl = defaultValues?.imageUrl;
   const defaultCategoryName = defaultValues?.categoryName;
@@ -78,10 +76,8 @@ export function PartForm({ defaultValues, mode, onSuccess, onCancel, className }
       categoryId: defaultCategoryId,
       brand: defaultBrand,
       type: defaultType,
-      purchasePriceCny: defaultPurchasePriceCny,
-      wholesalePriceCny: defaultWholesalePriceCny,
       sellingPriceCny: defaultSellingPriceCny,
-      supplierId: defaultSupplierId,
+      supplierPrices: defaultSupplierPrices,
       note: defaultNote,
       imageUrl: defaultImageUrl,
     }));
@@ -92,16 +88,39 @@ export function PartForm({ defaultValues, mode, onSuccess, onCancel, className }
     defaultCategoryId,
     defaultBrand,
     defaultType,
-    defaultPurchasePriceCny,
-    defaultWholesalePriceCny,
     defaultSellingPriceCny,
-    defaultSupplierId,
+    defaultSupplierPrices,
     defaultNote,
     defaultImageUrl,
   ]);
 
   function updateField(key: keyof PartFormData, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateSupplierPrice(index: number, key: "supplierId" | "purchasePriceCny" | "wholesalePriceCny" | "note", value: string) {
+    setForm((current) => ({
+      ...current,
+      supplierPrices: current.supplierPrices.map((price, priceIndex) => (
+        priceIndex === index ? { ...price, [key]: value } : price
+      )),
+    }));
+  }
+
+  function addSupplierPrice() {
+    setForm((current) => ({
+      ...current,
+      supplierPrices: [...current.supplierPrices, { supplierId: "", purchasePriceCny: "", wholesalePriceCny: "", note: "" }],
+    }));
+  }
+
+  function removeSupplierPrice(index: number) {
+    setForm((current) => ({
+      ...current,
+      supplierPrices: current.supplierPrices.length > 1
+        ? current.supplierPrices.filter((_, priceIndex) => priceIndex !== index)
+        : [{ supplierId: "", purchasePriceCny: "", wholesalePriceCny: "", note: "" }],
+    }));
   }
 
   async function uploadImage(file: File) {
@@ -170,6 +189,9 @@ export function PartForm({ defaultValues, mode, onSuccess, onCancel, className }
         defaultCategoryName={defaultCategoryName}
         defaultSupplierName={defaultSupplierName}
         onChange={updateField}
+        onSupplierPriceChange={updateSupplierPrice}
+        onAddSupplierPrice={addSupplierPrice}
+        onRemoveSupplierPrice={removeSupplierPrice}
       />
 
       <PartImageUpload

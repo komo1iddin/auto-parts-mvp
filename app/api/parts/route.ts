@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrManager, unauthorized, getAuthUser, hasAuthSessionCookie } from "@/lib/auth";
 import { getPartsList, revalidateAppData } from "@/lib/data";
+import { buildSupplierPricesFromBody, replaceVariantSupplierPrices } from "@/lib/part-supplier-prices";
 
 export async function GET(req: NextRequest) {
   const user = (await hasAuthSessionCookie()) ? await getAuthUser() : null;
@@ -40,8 +41,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     code, name, categoryId, brand, type,
-    purchasePriceCny, wholesalePriceCny, sellingPriceCny,
-    supplierId, imageUrl, note,
+    sellingPriceCny,
+    imageUrl, note,
   } = body;
 
   if (!code) return Response.json({ error: "Qism kodi majburiy" }, { status: 400 });
@@ -59,20 +60,23 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      return tx.partVariant.create({
+      const duplicate = (await tx.partVariant.findMany({ where: { partId: family.id, type: type || "original" } }))
+        .find((variant: { brand?: string | null }) => (variant.brand ?? "") === (brand?.trim() || ""));
+      if (duplicate) throw new Error("Unique constraint");
+
+      const variant = await tx.partVariant.create({
         data: {
           partId: family.id,
           brand: brand?.trim() || null,
           type: type || "original",
-          purchasePriceCny: purchasePriceCny ? Number(purchasePriceCny) : null,
-          wholesalePriceCny: wholesalePriceCny ? Number(wholesalePriceCny) : null,
           sellingPriceCny: sellingPriceCny ? Number(sellingPriceCny) : null,
-          supplierId: supplierId || null,
           imageUrl: imageUrl || null,
           note: note?.trim() || null,
         },
-        include: { part: { include: { category: true } }, supplier: true },
+        include: { part: { include: { category: true } } },
       });
+
+      return replaceVariantSupplierPrices(variant.id, buildSupplierPricesFromBody(body));
     });
     revalidateAppData("parts");
     return Response.json({ part }, { status: 201 });

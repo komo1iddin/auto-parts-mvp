@@ -1,12 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { revalidateAppData } from "@/lib/data";
-import type { ImportResolution, ParsedOrderRow, PartFamily, PartWithRelations } from "./types";
+import { normalizePartCodeAlias } from "@/lib/part-code-normalization";
+import type { ImportResolution, ImportWarning, ParsedOrderRow, PartFamily, PartWithRelations } from "./types";
 import {
-  addPartToIndexes,
   buildPartIndexes,
   buildTypeOptions,
   findCatalogPartForRow,
-  mapByName,
   partKey,
 } from "./catalog";
 import { applyResolutions, getResolutionIssues } from "./resolution";
@@ -16,10 +14,13 @@ import { normalizeKey } from "./normalization";
 async function loadImportContext() {
   const [families, existingVariants, categories, suppliers, rawTypeOptions] = await Promise.all([
     prisma.part.findMany({
-      include: { category: true },
+      include: { category: true, codeAliases: true },
     }),
     prisma.partVariant.findMany({
-      include: { part: { include: { category: true } }, supplier: true },
+      include: {
+        part: { include: { category: true } },
+        supplierPrices: { include: { supplier: true }, orderBy: [{ purchasePriceCny: "asc" }, { createdAt: "asc" }] },
+      },
     }),
     prisma.category.findMany(),
     prisma.supplier.findMany(),
@@ -46,15 +47,12 @@ async function loadImportContext() {
 }
 
 export async function finalizeImport(parsedRows: ParsedOrderRow[], resolutions: ImportResolution[] = []) {
-  const { families, existingParts, categories, suppliers, typeOptions } = await loadImportContext();
+  const { families, existingParts, typeOptions } = await loadImportContext();
   const rows = applyResolutions(parsedRows, resolutions);
-  const categoryByName = mapByName(categories);
-  const supplierByName = mapByName(suppliers);
-  const familiesByCode = new Map<string, PartFamily>(
-    (families as PartFamily[]).map((family) => [normalizeKey(family.code), family])
-  );
-  const { partsByKey, partsByCode } = buildPartIndexes(existingParts);
-  const issues = getResolutionIssues(rows, partsByKey, partsByCode, typeOptions);
+  const typedFamilies = families as PartFamily[];
+  const { partsByKey, partsByCode, partsByAlias, partsByName } = buildPartIndexes(existingParts, typedFamilies);
+  const issues = getResolutionIssues(rows, partsByKey, partsByCode, typeOptions, partsByAlias, partsByName);
+  const warnings = buildImportWarnings(rows, typedFamilies, partsByCode, partsByAlias, partsByName);
 
   if (issues.length) {
     return {
@@ -62,6 +60,7 @@ export async function finalizeImport(parsedRows: ParsedOrderRow[], resolutions: 
       rows,
       issues,
       typeOptions,
+      warnings,
       summary: {
         parsedCount: rows.length,
         createdCount: 0,
@@ -71,80 +70,74 @@ export async function finalizeImport(parsedRows: ParsedOrderRow[], resolutions: 
     };
   }
 
-  const createdCodes: string[] = [];
-  const createdVariantKeys = new Set<string>();
+  const pendingCodes: string[] = [];
   const partByRowKey = new Map<string, PartWithRelations>();
 
   for (const row of rows) {
-    const existingPart = findCatalogPartForRow(row, partsByKey, partsByCode);
+    const existingPart = findCatalogPartForRow(row, partsByKey, partsByCode, partsByAlias, partsByName);
     if (existingPart) {
       partByRowKey.set(row.rowKey, existingPart);
       continue;
     }
 
-    const createdPart = await createCatalogPart(row, categoryByName, supplierByName, familiesByCode);
-    addPartToIndexes(createdPart, partsByKey, partsByCode);
-    partByRowKey.set(row.rowKey, createdPart);
-    createdVariantKeys.add(row.rowKey);
-    createdCodes.push(`${createdPart.code} (${createdPart.brand || "brend yo'q"} / ${createdPart.type})`);
+    pendingCodes.push(`${row.partCode} (${row.brand || "brend yo'q"} / ${row.type})`);
   }
-
-  if (createdCodes.length) revalidateAppData("parts");
 
   return {
     requiresResolution: false,
-    items: buildImportedItems(rows, partsByKey, partByRowKey, createdVariantKeys),
+    items: buildImportedItems(rows, partsByKey, partByRowKey),
+    warnings,
     summary: {
       parsedCount: rows.length,
-      createdCount: createdCodes.length,
-      existingCount: rows.length - createdCodes.length,
-      createdCodes,
+      createdCount: pendingCodes.length,
+      existingCount: rows.length - pendingCodes.length,
+      createdCodes: pendingCodes,
     },
   };
 }
 
-async function createCatalogPart(
-  row: ParsedOrderRow,
-  categoryByName: Map<string, { id: string; name: string }>,
-  supplierByName: Map<string, { id: string; name: string }>,
-  familiesByCode: Map<string, PartFamily>
+function buildImportWarnings(
+  rows: ParsedOrderRow[],
+  families: PartFamily[],
+  partsByCode: Map<string, PartWithRelations[]>,
+  partsByAlias: Map<string, PartWithRelations[]>,
+  partsByName: Map<string, PartWithRelations[]>
 ) {
-  const category = row.categoryName ? categoryByName.get(normalizeKey(row.categoryName)) : undefined;
-  const supplier = row.supplierName ? supplierByName.get(normalizeKey(row.supplierName)) : undefined;
-  let family = familiesByCode.get(normalizeKey(row.partCode));
+  const familyById = new Map(families.map((family) => [family.id, family]));
+  const warnings: ImportWarning[] = [];
 
-  if (!family) {
-    const createdFamily = await prisma.part.create({
-      data: {
-        code: row.partCode,
-        name: row.partName || null,
-        categoryId: category?.id ?? null,
-      },
-      include: { category: true },
-    }) as PartFamily;
-    family = createdFamily;
-    familiesByCode.set(normalizeKey(family.code), family);
+  for (const row of rows) {
+    const normalizedCode = normalizePartCodeAlias(row.partCode);
+    const aliasMatches = partsByAlias.get(normalizedCode) ?? [];
+    const exactMatches = partsByCode.get(normalizeKey(row.partCode)) ?? [];
+    if (!exactMatches.length && aliasMatches.length) {
+      const family = familyById.get(aliasMatches[0].partId);
+      warnings.push({
+        rowKey: row.rowKey,
+        partCode: row.partCode,
+        partName: row.partName,
+        reason: "possible_duplicate_code",
+        message: `${row.partCode} kodi ${family?.code ?? aliasMatches[0].code} bilan alias orqali bog'landi.`,
+        suggestedAction: "Agar bu bog'lanish noto'g'ri bo'lsa, zapchast aliasini tekshiring.",
+        matchingPart: family ? { partId: family.id, code: family.code, name: family.name } : undefined,
+      });
+      continue;
+    }
+
+    const nameMatches = partsByName.get(normalizeKey(row.partName || row.partCode)) ?? [];
+    if (!exactMatches.length && !aliasMatches.length && nameMatches.length) {
+      const family = familyById.get(nameMatches[0].partId);
+      warnings.push({
+        rowKey: row.rowKey,
+        partCode: row.partCode,
+        partName: row.partName,
+        reason: "possible_duplicate_name",
+        message: `${row.partCode} kodi topilmadi, lekin nomi ${family?.code ?? nameMatches[0].code} zapchastiga o'xshaydi.`,
+        suggestedAction: "Agar bu bitta zapchast bo'lsa, part listdan alias qo'shing.",
+        matchingPart: family ? { partId: family.id, code: family.code, name: family.name } : undefined,
+      });
+    }
   }
 
-  const created = await prisma.partVariant.create({
-    data: {
-      partId: family.id,
-      brand: row.brand || null,
-      type: row.type,
-      purchasePriceCny: row.purchasePriceCny,
-      wholesalePriceCny: row.wholesalePriceCny,
-      sellingPriceCny: row.sellingPriceCny ?? row.purchasePriceCny,
-      supplierId: supplier?.id ?? null,
-      note: row.note || null,
-    },
-    include: { part: { include: { category: true } }, supplier: true },
-  });
-
-  return {
-    ...created,
-    code: created.part.code,
-    name: created.part.name,
-    category: created.part.category,
-    categoryName: created.part.category?.name,
-  };
+  return warnings;
 }

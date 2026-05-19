@@ -1,6 +1,7 @@
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
+import { Button } from "@/components/ui/Button";
 import { PART_TYPES } from "@/lib/utils";
 import type { Category, PartFormData, SettingOption, Supplier } from "@/components/parts/types/parts";
 
@@ -13,6 +14,9 @@ interface PartFormFieldsProps {
   defaultCategoryName?: string;
   defaultSupplierName?: string;
   onChange: (key: keyof PartFormData, value: string) => void;
+  onSupplierPriceChange: (index: number, key: "supplierId" | "purchasePriceCny" | "wholesalePriceCny" | "note", value: string) => void;
+  onAddSupplierPrice: () => void;
+  onRemoveSupplierPrice: (index: number) => void;
 }
 
 export function PartFormFields({
@@ -24,6 +28,9 @@ export function PartFormFields({
   defaultCategoryName,
   defaultSupplierName,
   onChange,
+  onSupplierPriceChange,
+  onAddSupplierPrice,
+  onRemoveSupplierPrice,
 }: PartFormFieldsProps) {
   const typeOptions = partQualityTypes.length
     ? partQualityTypes
@@ -95,42 +102,6 @@ export function PartFormFields({
             </option>
           ))}
         </Select>
-        <Select
-          label="Ta'minotchi"
-          value={form.supplierId}
-          onChange={(event) => onChange("supplierId", event.target.value)}
-        >
-          <option value="">— Tanlanmagan —</option>
-          {form.supplierId && !suppliers.some((supplier) => supplier.id === form.supplierId) && (
-            <option value={form.supplierId}>
-              {defaultSupplierName ?? "Tanlangan ta'minotchi"}
-            </option>
-          )}
-          {suppliers.map((supplier) => (
-            <option key={supplier.id} value={supplier.id}>
-              {supplier.name}
-            </option>
-          ))}
-        </Select>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-        <Input
-          label="Xarid narxi (¥)"
-          type="number"
-          step="0.01"
-          value={form.purchasePriceCny}
-          onChange={(event) => onChange("purchasePriceCny", event.target.value)}
-          placeholder="0.00"
-        />
-        <Input
-          label="Ulgurji narx (¥)"
-          type="number"
-          step="0.01"
-          value={form.wholesalePriceCny}
-          onChange={(event) => onChange("wholesalePriceCny", event.target.value)}
-          placeholder="0.00"
-        />
         <Input
           label="Sotuv narxi (¥)"
           type="number"
@@ -139,6 +110,68 @@ export function PartFormFields({
           onChange={(event) => onChange("sellingPriceCny", event.target.value)}
           placeholder="0.00"
         />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-foreground">Ta'minotchi narxlari</p>
+          <Button type="button" variant="outline" size="sm" onClick={onAddSupplierPrice}>
+            Qo'shish
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          {form.supplierPrices.map((price, index) => (
+            <div key={price.id ?? index} className="grid grid-cols-1 gap-3 rounded-md border border-gray-100 bg-gray-50 p-3 md:grid-cols-[1.4fr_1fr_1fr_auto]">
+              <Select
+                label="Ta'minotchi"
+                value={price.supplierId}
+                onChange={(event) => onSupplierPriceChange(index, "supplierId", event.target.value)}
+              >
+                <option value="">— Tanlanmagan —</option>
+                {price.supplierId && !suppliers.some((supplier) => supplier.id === price.supplierId) && (
+                  <option value={price.supplierId}>
+                    {defaultSupplierName ?? "Tanlangan ta'minotchi"}
+                  </option>
+                )}
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </Select>
+              <Input
+                label="Xarid narxi (¥)"
+                type="number"
+                step="0.01"
+                value={price.purchasePriceCny}
+                onChange={(event) => onSupplierPriceChange(index, "purchasePriceCny", event.target.value)}
+                placeholder="0.00"
+              />
+              <Input
+                label="Ulgurji narx (¥)"
+                type="number"
+                step="0.01"
+                value={price.wholesalePriceCny}
+                onChange={(event) => onSupplierPriceChange(index, "wholesalePriceCny", event.target.value)}
+                placeholder="0.00"
+              />
+              <div className="flex items-end">
+                <Button type="button" variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => onRemoveSupplierPrice(index)}>
+                  O'chirish
+                </Button>
+              </div>
+              <div className="md:col-span-4">
+                <Input
+                  label="Narx izohi"
+                  value={price.note}
+                  onChange={(event) => onSupplierPriceChange(index, "note", event.target.value)}
+                  placeholder="Masalan: muddat, partiya, shart..."
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <Textarea

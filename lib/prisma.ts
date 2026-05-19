@@ -28,6 +28,8 @@ const tableByModel = {
   supplierPayment: "supplier_payments",
   settingOption: "setting_options",
   partVariant: "part_variants",
+  partSupplierPrice: "part_supplier_prices",
+  partCodeAlias: "part_code_aliases",
 } as const;
 
 const columnByField: Record<string, string> = {
@@ -48,6 +50,7 @@ const columnByField: Record<string, string> = {
   orderId: "order_id",
   partId: "part_id",
   partVariantId: "part_variant_id",
+  partSupplierPriceId: "part_supplier_price_id",
   partCode: "part_code",
   partName: "part_name",
   categoryName: "category_name",
@@ -63,6 +66,7 @@ const columnByField: Record<string, string> = {
   paymentDate: "payment_date",
   paymentMethod: "payment_method",
   sortOrder: "sort_order",
+  normalizedCode: "normalized_code",
 };
 
 const fieldByColumn = Object.fromEntries(
@@ -317,22 +321,30 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
   }
 
   if (model === "part") {
-    const [categories, suppliers] = await Promise.all([
+    const [categories, suppliers, aliases] = await Promise.all([
       include.category ? selectByIds("category", rows.map((row) => row.categoryId)) : Promise.resolve(new Map()),
       include.supplier ? selectByIds("supplier", rows.map((row) => row.supplierId)) : Promise.resolve(new Map()),
+      include.codeAliases ? selectWhereIn("partCodeAlias", "partId", rows.map((row) => row.id)) : Promise.resolve([]),
     ]);
+    const aliasesByPart = new Map<string, AnyRecord[]>();
+    for (const alias of aliases as AnyRecord[]) {
+      aliasesByPart.set(alias.partId, [...(aliasesByPart.get(alias.partId) ?? []), alias]);
+    }
 
     return rows.map((row) => ({
       ...row,
       ...(include.category ? { category: row.categoryId ? categories.get(row.categoryId) ?? null : null } : {}),
       ...(include.supplier ? { supplier: row.supplierId ? suppliers.get(row.supplierId) ?? null : null } : {}),
+      ...(include.codeAliases ? { codeAliases: aliasesByPart.get(row.id) ?? [] } : {}),
     }));
   }
 
   if (model === "partVariant") {
-    const [parts, suppliers] = await Promise.all([
+    const [parts, supplierPrices] = await Promise.all([
       include.part ? selectByIds("part", rows.map((row) => row.partId)) : Promise.resolve(new Map()),
-      include.supplier ? selectByIds("supplier", rows.map((row) => row.supplierId)) : Promise.resolve(new Map()),
+      include.supplierPrices
+        ? selectWhereIn("partSupplierPrice", "partVariantId", rows.map((row) => row.id))
+        : Promise.resolve([]),
     ]);
     let partRows = Array.from(parts.values());
     if (include.part?.include) {
@@ -340,9 +352,29 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
     }
     const partsWithIncludes = new Map(partRows.map((part) => [part.id, part]));
 
+    const supplierPricesWithIncludes = (include.supplierPrices
+      ? await applyBatchedIncludes("partSupplierPrice", supplierPrices, include.supplierPrices.include)
+      : []) as AnyRecord[];
+    const supplierPricesByVariant = new Map<string, AnyRecord[]>();
+    for (const price of supplierPricesWithIncludes) {
+      if (!price) continue;
+      supplierPricesByVariant.set(price.partVariantId, [...(supplierPricesByVariant.get(price.partVariantId) ?? []), price]);
+    }
+
     return rows.map((row) => ({
       ...row,
       ...(include.part ? { part: row.partId ? partsWithIncludes.get(row.partId) ?? null : null } : {}),
+      ...(include.supplierPrices ? { supplierPrices: (supplierPricesByVariant.get(row.id) ?? []).sort(compareBy(include.supplierPrices.orderBy)) } : {}),
+    }));
+  }
+
+  if (model === "partSupplierPrice") {
+    const suppliers = include.supplier
+      ? await selectByIds("supplier", rows.map((row) => row.supplierId))
+      : new Map<string, AnyRecord>();
+
+    return rows.map((row) => ({
+      ...row,
       ...(include.supplier ? { supplier: row.supplierId ? suppliers.get(row.supplierId) ?? null : null } : {}),
     }));
   }
@@ -475,6 +507,9 @@ async function applyIncludes(model: keyof typeof tableByModel, row: AnyRecord | 
     const next = { ...row };
     if (include.category) next.category = row.categoryId ? await prisma.category.findUnique({ where: { id: row.categoryId } }) : null;
     if (include.supplier) next.supplier = row.supplierId ? await prisma.supplier.findUnique({ where: { id: row.supplierId } }) : null;
+    if (include.codeAliases) {
+      next.codeAliases = (await selectAll("partCodeAlias")).filter((alias) => alias.partId === row.id);
+    }
     return next;
   }
 
@@ -485,6 +520,17 @@ async function applyIncludes(model: keyof typeof tableByModel, row: AnyRecord | 
         ? await prisma.part.findUnique({ where: { id: row.partId }, include: include.part.include })
         : null;
     }
+    if (include.supplierPrices) {
+      const prices = (await selectAll("partSupplierPrice"))
+        .filter((price) => price.partVariantId === row.id)
+        .sort(compareBy(include.supplierPrices.orderBy));
+      next.supplierPrices = await Promise.all(prices.map((price) => applyIncludes("partSupplierPrice", price, include.supplierPrices.include)));
+    }
+    return next;
+  }
+
+  if (model === "partSupplierPrice") {
+    const next = { ...row };
     if (include.supplier) {
       next.supplier = row.supplierId ? await prisma.supplier.findUnique({ where: { id: row.supplierId } }) : null;
     }
@@ -715,6 +761,8 @@ export const prisma: any = {
   customer: modelApi("customer"),
   part: modelApi("part"),
   partVariant: modelApi("partVariant"),
+  partSupplierPrice: modelApi("partSupplierPrice"),
+  partCodeAlias: modelApi("partCodeAlias"),
   order: modelApi("order"),
   orderItem: modelApi("orderItem"),
   orderRevision: modelApi("orderRevision"),

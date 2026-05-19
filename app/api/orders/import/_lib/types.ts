@@ -21,12 +21,15 @@ export type PartWithRelations = {
   categoryName?: string | null;
   brand?: string | null;
   type: string;
-  purchasePriceCny?: unknown;
-  wholesalePriceCny?: unknown;
   sellingPriceCny?: unknown;
-  supplierId?: string | null;
+  supplierPrices?: Array<{
+    id: string;
+    supplierId: string;
+    purchasePriceCny?: unknown;
+    wholesalePriceCny?: unknown;
+    supplier?: { name?: string | null } | null;
+  }>;
   category?: { name?: string | null } | null;
-  supplier?: { name?: string | null } | null;
 };
 
 export type PartFamily = {
@@ -35,6 +38,21 @@ export type PartFamily = {
   name?: string | null;
   categoryId?: string | null;
   category?: { name?: string | null } | null;
+  codeAliases?: Array<{ code: string; normalizedCode: string }>;
+};
+
+export type ImportWarning = {
+  rowKey: string;
+  partCode: string;
+  partName: string;
+  reason: "possible_duplicate_code" | "possible_duplicate_name";
+  message: string;
+  suggestedAction: string;
+  matchingPart?: {
+    partId: string;
+    code: string;
+    name?: string | null;
+  };
 };
 
 export type TypeOption = {
