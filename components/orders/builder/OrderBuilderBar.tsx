@@ -2,14 +2,8 @@
 
 import { ArrowLeft, X, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import type { OrderItem } from "@/components/orders/types/orderBuilderTypes";
 import { formatCny, formatNumber } from "@/lib/utils";
-
-interface OrderItem {
-  partId: string;
-  partCode: string;
-  partName: string;
-  quantity: number;
-}
 
 interface UndoState {
   item: OrderItem;

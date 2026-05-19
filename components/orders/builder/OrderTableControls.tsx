@@ -97,14 +97,12 @@ export function TableInput({
   value,
   onChange,
   width,
-  center,
   placeholder,
   step = 0.01,
 }: {
   value: string | number;
   onChange: (v: string) => void;
   width: number;
-  center?: boolean;
   placeholder?: string;
   step?: number;
 }) {
@@ -146,8 +144,7 @@ export function TableInput({
       className={cn(
         "flex h-8 rounded-md border border-input bg-background px-2 py-0 text-center text-sm shadow-xs transition-colors outline-none [appearance:textfield]",
         "focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/50",
-        "[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-        center && "text-center"
+        "[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       )}
       style={{ width }}
     />

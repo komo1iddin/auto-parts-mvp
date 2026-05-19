@@ -98,7 +98,6 @@ export function OrderItemsTableRow({
             value={item.quantity}
             onChange={(value) => updateQty(rowKey, value === "" ? 0 : Number(value))}
             width={64}
-            center
             step={1}
           />
         </div>
