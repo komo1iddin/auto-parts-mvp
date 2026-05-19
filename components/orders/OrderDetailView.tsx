@@ -4,7 +4,7 @@ import { OrderRevisions } from "@/components/orders/detail/OrderRevisions";
 import type { OrderDetailViewProps } from "@/components/orders/types/orderDetailTypes";
 import { exportLabel } from "@/components/orders/detail/orderDetailUtils";
 
-export function OrderDetailView({ order, isAdmin, basePath, exports, financePanel }: OrderDetailViewProps) {
+export function OrderDetailView({ order, isAdmin, basePath, exports, financePanel, financeSummary }: OrderDetailViewProps) {
   const supplierNames = [...new Set(order.items.map((item) => item.supplierName).filter(isPresent))];
   const supplierIds = [...new Set(order.items.map((item) => item.supplierId).filter(isPresent))];
   const latestExport = [...exports].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
@@ -22,7 +22,7 @@ export function OrderDetailView({ order, isAdmin, basePath, exports, financePane
 
       {financePanel}
 
-      <OrderDetailItemsTable order={order} isAdmin={isAdmin} />
+      <OrderDetailItemsTable order={order} isAdmin={isAdmin} financeSummary={financeSummary} />
 
       <OrderRevisions revisions={order.revisions} />
     </div>

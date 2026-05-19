@@ -46,6 +46,8 @@ export default async function ManagerOrderDetailPage({
     ...finance,
     supplierTotal: 0,
     expectedGrossProfit: 0,
+    profitWithdrawn: 0,
+    profitBalance: 0,
     supplierPaid: 0,
     supplierBalance: 0,
     cashDifference: 0,
@@ -58,12 +60,24 @@ export default async function ManagerOrderDetailPage({
       exports={exports}
       isAdmin={false}
       basePath="/manager/orders"
+      financeSummary={clientFinance}
       financePanel={
         <OrderFinancePanel
           orderId={order.id}
+          orderNumber={order.currentOrderNumber}
           financePath={`/manager/orders/${order.id}/finance`}
           isAdmin={false}
+          canManageClientPayments={Boolean(user?.canCreateClientPayments)}
           summary={clientFinance}
+          clientPayments={clientPayments.map((payment) => ({
+            ...payment,
+            amountCny: payment.amountCny.toString(),
+            paymentDate: payment.paymentDate.toISOString(),
+            createdAt: payment.createdAt.toISOString(),
+          }))}
+          supplierPayments={[]}
+          profitWithdrawals={[]}
+          suppliers={[]}
         />
       }
     />

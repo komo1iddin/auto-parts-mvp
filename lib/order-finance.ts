@@ -46,6 +46,8 @@ export interface OrderFinanceSummary {
   clientTotal: number;
   supplierTotal: number;
   expectedGrossProfit: number;
+  profitWithdrawn: number;
+  profitBalance: number;
   clientPaid: number;
   supplierPaid: number;
   clientBalance: number;
@@ -90,7 +92,8 @@ export function getOrderFinanceStatus(
 export function calculateOrderFinance(
   items: FinanceItem[] = [],
   clientPayments: FinancePayment[] = [],
-  supplierPayments: FinancePayment[] = []
+  supplierPayments: FinancePayment[] = [],
+  profitWithdrawals: FinancePayment[] = []
 ): OrderFinanceSummary {
   const clientTotal = items.reduce(
     (sum, item) => sum + moneyToNumber(item.sellingPriceCny) * item.quantity,
@@ -102,6 +105,7 @@ export function calculateOrderFinance(
   );
   const clientPaid = clientPayments.reduce((sum, payment) => sum + moneyToNumber(payment.amountCny), 0);
   const supplierPaid = supplierPayments.reduce((sum, payment) => sum + moneyToNumber(payment.amountCny), 0);
+  const profitWithdrawn = profitWithdrawals.reduce((sum, payment) => sum + moneyToNumber(payment.amountCny), 0);
 
   const supplierMap = new Map<string, SupplierFinanceBreakdown>();
   for (const item of items) {
@@ -132,15 +136,19 @@ export function calculateOrderFinance(
     }))
     .sort((a, b) => a.supplierName.localeCompare(b.supplierName));
 
+  const expectedGrossProfit = clientTotal - supplierTotal;
+
   return {
     clientTotal,
     supplierTotal,
-    expectedGrossProfit: clientTotal - supplierTotal,
+    expectedGrossProfit,
+    profitWithdrawn,
+    profitBalance: expectedGrossProfit - profitWithdrawn,
     clientPaid,
     supplierPaid,
     clientBalance: clientTotal - clientPaid,
     supplierBalance: supplierTotal - supplierPaid,
-    cashDifference: clientPaid - supplierPaid,
+    cashDifference: clientPaid - supplierPaid - profitWithdrawn,
     clientPaymentStatus: getPaymentStatus(clientTotal, clientPaid),
     supplierPaymentStatus: getPaymentStatus(supplierTotal, supplierPaid),
     orderFinanceStatus: getOrderFinanceStatus(clientTotal, clientPaid, supplierTotal, supplierPaid),

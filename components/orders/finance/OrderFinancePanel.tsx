@@ -1,13 +1,24 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
 import { ArrowRight, Landmark } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import { OrderFinancePage } from "@/components/orders/OrderFinancePage";
+import type { PaymentRecord, SupplierOption } from "@/components/orders/types/orderFinanceTypes";
 import { type OrderFinanceSummary, type PaymentStatus } from "@/lib/order-finance";
 import { cn, formatCny } from "@/lib/utils";
 
 interface OrderFinancePanelProps {
   orderId: string;
+  orderNumber: string;
   financePath: string;
   isAdmin: boolean;
+  canManageClientPayments: boolean;
   summary: OrderFinanceSummary;
+  clientPayments: PaymentRecord[];
+  supplierPayments: PaymentRecord[];
+  profitWithdrawals: PaymentRecord[];
+  suppliers: SupplierOption[];
 }
 
 const CLIENT_STATUS_LABELS: Record<PaymentStatus, string> = {
@@ -25,10 +36,18 @@ function statusBadgeClass(status: PaymentStatus) {
 }
 
 export function OrderFinancePanel({
+  orderId,
+  orderNumber,
   financePath,
   isAdmin,
+  canManageClientPayments,
   summary,
+  clientPayments,
+  supplierPayments,
+  profitWithdrawals,
+  suppliers,
 }: OrderFinancePanelProps) {
+  const [open, setOpen] = useState(false);
   const stats: { label: string; value: string; tone: FinanceTone }[] = [
     { label: "Jami", value: formatCny(summary.clientTotal), tone: "neutral" },
     { label: "To'landi", value: formatCny(summary.clientPaid), tone: "neutral" },
@@ -77,14 +96,36 @@ export function OrderFinancePanel({
             ))}
           </div>
         </div>
-        <Link
-          href={financePath}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
           className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-950"
         >
           Moliya paneli
           <ArrowRight className="size-4" />
-        </Link>
+        </button>
       </div>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Moliya: ${orderNumber}`}
+        className="max-w-[1400px] p-0"
+      >
+        <OrderFinancePage
+          orderId={orderId}
+          orderNumber={orderNumber}
+          backPath={financePath}
+          isAdmin={isAdmin}
+          canManageClientPayments={canManageClientPayments}
+          embedded
+          summary={summary}
+          clientPayments={clientPayments}
+          supplierPayments={supplierPayments}
+          profitWithdrawals={profitWithdrawals}
+          suppliers={suppliers}
+        />
+      </Modal>
     </section>
   );
 }

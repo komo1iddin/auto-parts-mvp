@@ -8,15 +8,15 @@ function isValidMethod(method: string) {
   return PAYMENT_METHODS.includes(method as (typeof PAYMENT_METHODS)[number]);
 }
 
-async function getPayment(orderId: string, paymentId: string) {
-  const payment = await prisma.supplierPayment.findUnique({ where: { id: paymentId } });
-  if (!payment || payment.orderId !== orderId) return null;
-  return payment;
+async function getWithdrawal(orderId: string, withdrawalId: string) {
+  const withdrawal = await prisma.profitWithdrawal.findUnique({ where: { id: withdrawalId } });
+  if (!withdrawal || withdrawal.orderId !== orderId) return null;
+  return withdrawal;
 }
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; paymentId: string }> }
+  { params }: { params: Promise<{ id: string; withdrawalId: string }> }
 ) {
   let user;
   try {
@@ -26,13 +26,12 @@ export async function PUT(
   }
   if (user.role !== "admin") return forbidden();
 
-  const { id, paymentId } = await params;
-  const existing = await getPayment(id, paymentId);
+  const { id, withdrawalId } = await params;
+  const existing = await getWithdrawal(id, withdrawalId);
   if (!existing) return Response.json({ error: "Topilmadi" }, { status: 404 });
 
-  const { amountCny, paymentDate, paymentMethod, note, supplierId } = await req.json();
+  const { amountCny, paymentDate, paymentMethod, note } = await req.json();
   const amount = Number(amountCny);
-  if (!supplierId) return Response.json({ error: "Ta'minotchi majburiy" }, { status: 400 });
   if (!Number.isFinite(amount) || amount <= 0) {
     return Response.json({ error: "To'lov miqdori noto'g'ri" }, { status: 400 });
   }
@@ -42,12 +41,6 @@ export async function PUT(
   if (!isValidMethod(paymentMethod)) {
     return Response.json({ error: "To'lov usuli noto'g'ri" }, { status: 400 });
   }
-
-  const [orderSupplier] = await prisma.orderItem.findMany({
-    where: { orderId: id, supplierId },
-    take: 1,
-  });
-  if (!orderSupplier) return forbidden("Bu ta'minotchi buyurtmada yo'q");
 
   const order = await prisma.order.findUnique({
     where: { id },
@@ -60,19 +53,19 @@ export async function PUT(
   });
   if (!order) return Response.json({ error: "Topilmadi" }, { status: 404 });
 
-  const otherSupplierPayments = order.supplierPayments.filter((payment: { id: string }) => payment.id !== paymentId);
-  const finance = calculateOrderFinance(order.items, order.clientPayments, otherSupplierPayments, order.profitWithdrawals);
-  if (amount > finance.cashDifference) {
+  const otherWithdrawals = order.profitWithdrawals.filter((payment: { id: string }) => payment.id !== withdrawalId);
+  const finance = calculateOrderFinance(order.items, order.clientPayments, order.supplierPayments, otherWithdrawals);
+  const availableProfit = Math.max(0, Math.min(finance.cashDifference, finance.profitBalance));
+  if (amount > availableProfit) {
     return Response.json(
-      { error: `Customer cash yetarli emas. Available: ${finance.cashDifference}` },
+      { error: `Olish mumkin bo'lgan foyda yetarli emas. Mavjud: ${availableProfit}` },
       { status: 400 }
     );
   }
 
-  const payment = await prisma.supplierPayment.update({
-    where: { id: paymentId },
+  const withdrawal = await prisma.profitWithdrawal.update({
+    where: { id: withdrawalId },
     data: {
-      supplierId,
       amountCny: amount,
       paymentDate: new Date(paymentDate),
       paymentMethod,
@@ -81,12 +74,12 @@ export async function PUT(
   });
 
   revalidateAppData("orders");
-  return Response.json({ payment });
+  return Response.json({ withdrawal });
 }
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string; paymentId: string }> }
+  { params }: { params: Promise<{ id: string; withdrawalId: string }> }
 ) {
   try {
     const user = await requireAuth();
@@ -95,11 +88,11 @@ export async function DELETE(
     return unauthorized();
   }
 
-  const { id, paymentId } = await params;
-  const existing = await getPayment(id, paymentId);
+  const { id, withdrawalId } = await params;
+  const existing = await getWithdrawal(id, withdrawalId);
   if (!existing) return Response.json({ error: "Topilmadi" }, { status: 404 });
 
-  await prisma.supplierPayment.delete({ where: { id: paymentId } });
+  await prisma.profitWithdrawal.delete({ where: { id: withdrawalId } });
 
   revalidateAppData("orders");
   return Response.json({ ok: true });

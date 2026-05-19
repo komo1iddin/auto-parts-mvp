@@ -28,6 +28,10 @@ export default async function AdminOrderFinancePage({
             supplier: { select: { name: true } },
           },
         },
+        profitWithdrawals: {
+          orderBy: { paymentDate: "desc" },
+          include: { creator: { select: { name: true } } },
+        },
       },
     }),
     prisma.supplier.findMany({
@@ -40,7 +44,8 @@ export default async function AdminOrderFinancePage({
 
   const clientPayments = order.clientPayments ?? [];
   const supplierPayments = order.supplierPayments ?? [];
-  const finance = calculateOrderFinance(order.items ?? [], clientPayments, supplierPayments);
+  const profitWithdrawals = order.profitWithdrawals ?? [];
+  const finance = calculateOrderFinance(order.items ?? [], clientPayments, supplierPayments, profitWithdrawals);
   const orderSupplierIds = new Set(
     finance.supplierBreakdown
       .map((supplier) => supplier.supplierId)
@@ -63,6 +68,12 @@ export default async function AdminOrderFinancePage({
         createdAt: p.createdAt.toISOString(),
       }))}
       supplierPayments={supplierPayments.map((p) => ({
+        ...p,
+        amountCny: p.amountCny.toString(),
+        paymentDate: p.paymentDate.toISOString(),
+        createdAt: p.createdAt.toISOString(),
+      }))}
+      profitWithdrawals={profitWithdrawals.map((p) => ({
         ...p,
         amountCny: p.amountCny.toString(),
         paymentDate: p.paymentDate.toISOString(),

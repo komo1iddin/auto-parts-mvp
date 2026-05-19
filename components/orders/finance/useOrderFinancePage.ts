@@ -4,10 +4,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   PAYMENT_METHODS,
+  type OrderFinanceSummary,
   type PaymentMethod,
 } from "@/lib/order-finance";
 import type {
-  FinanceTabKey,
   PaymentForm,
   PaymentKind,
   PaymentRecord,
@@ -20,6 +20,7 @@ interface UseOrderFinancePageArgs {
   isAdmin: boolean;
   canManageClientPayments: boolean;
   suppliers: SupplierOption[];
+  summary: OrderFinanceSummary;
 }
 
 export function useOrderFinancePage({
@@ -27,10 +28,10 @@ export function useOrderFinancePage({
   isAdmin,
   canManageClientPayments,
   suppliers,
+  summary,
 }: UseOrderFinancePageArgs) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [tab, setTab] = useState<FinanceTabKey>(isAdmin ? "suppliers" : "client");
   const [modalKind, setModalKind] = useState<PaymentKind | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     kind: PaymentKind;
@@ -41,23 +42,53 @@ export function useOrderFinancePage({
   const [deleting, setDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const canCreateClient = isAdmin || canManageClientPayments;
-  const tabs: { key: FinanceTabKey; label: string }[] = [
-    ...(isAdmin ? [{ key: "suppliers" as FinanceTabKey, label: "Ta'minotchilar" }] : []),
-    { key: "client", label: "Mijoz to'lovlari" },
-    ...(isAdmin ? [{ key: "supplier" as FinanceTabKey, label: "Ta'minotchi to'lovlari" }] : []),
-  ];
+  const availableSupplierCash = Math.max(0, summary.cashDifference);
+  const availableProfit = Math.max(0, Math.min(summary.cashDifference, summary.profitBalance));
+  const canCreateSupplier = isAdmin && suppliers.length > 0 && availableSupplierCash > 0;
+  const canCreateProfit = isAdmin && availableProfit > 0;
+  const canCreateTransaction = canCreateClient || canCreateSupplier || canCreateProfit;
 
-  function openCreate(kind: PaymentKind, supplierId?: string | null) {
+  function openCreate(kind: PaymentKind, supplierId?: string | null, amountCny?: number) {
     setModalKind(kind);
-    setForm(buildEmptyForm(supplierId ?? suppliers[0]?.id));
+    const supplierDebt =
+      kind === "supplier"
+        ? summary.supplierBreakdown.find((supplier) => supplier.supplierId === (supplierId ?? suppliers[0]?.id))?.supplierBalance ?? 0
+        : 0;
+    const suggestedSupplierPayment = Math.max(0, Math.min(supplierDebt || availableSupplierCash, availableSupplierCash));
+    setForm({
+      ...buildEmptyForm(supplierId ?? suppliers[0]?.id),
+      amountCny: amountCny != null
+        ? String(amountCny)
+        : kind === "supplier" && suggestedSupplierPayment > 0
+          ? String(suggestedSupplierPayment)
+          : kind === "profit" && availableProfit > 0
+            ? String(availableProfit)
+            : "",
+    });
+  }
+
+  function openTransaction() {
+    openCreate(canCreateClient ? "client" : "supplier");
+  }
+
+  function switchCreateKind(kind: PaymentKind) {
+    if (form.id) return;
+    setModalKind(kind);
+    setForm((current) => ({
+      ...current,
+      amountCny: kind === "supplier" ? current.amountCny : current.amountCny,
+      supplierId: kind === "supplier" ? current.supplierId || suppliers[0]?.id || "" : current.supplierId,
+    }));
   }
 
   function openEdit(kind: PaymentKind, payment: PaymentRecord) {
-    setModalKind(kind);
+    const amount = Number(payment.amountCny);
+    const modalPaymentKind = kind === "client" && amount < 0 ? "refund" : kind;
+    setModalKind(modalPaymentKind);
     setForm({
       id: payment.id,
       supplierId: payment.supplierId ?? suppliers[0]?.id ?? "",
-      amountCny: String(payment.amountCny),
+      amountCny: String(Math.abs(amount)),
       paymentDate: toDateInput(payment.paymentDate),
       paymentMethod: PAYMENT_METHODS.includes(payment.paymentMethod as PaymentMethod)
         ? (payment.paymentMethod as PaymentMethod)
@@ -68,15 +99,25 @@ export function useOrderFinancePage({
 
   async function savePayment() {
     if (!modalKind) return;
+    if (modalKind === "supplier" && Number(form.amountCny) > availableSupplierCash) {
+      setErrorMessage(`Ta'minotchi to'lovi mijozdan kelgan mavjud puldan oshmasligi kerak. Mavjud: ${availableSupplierCash}`);
+      return;
+    }
+    if (modalKind === "profit" && Number(form.amountCny) > availableProfit) {
+      setErrorMessage(`Olish mumkin bo'lgan foyda yetarli emas. Mavjud: ${availableProfit}`);
+      return;
+    }
 
     setSaving(true);
-    const base = `/api/orders/${orderId}/${modalKind}-payments`;
+    const apiKind = modalKind === "refund" ? "client-payments" : modalKind === "profit" ? "profit-withdrawals" : `${modalKind}-payments`;
+    const signedAmount = modalKind === "refund" ? -Math.abs(Number(form.amountCny)) : Number(form.amountCny);
+    const base = `/api/orders/${orderId}/${apiKind}`;
     const url = form.id ? `${base}/${form.id}` : base;
     const response = await fetch(url, {
       method: form.id ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        amountCny: Number(form.amountCny),
+        amountCny: signedAmount,
         paymentDate: form.paymentDate,
         paymentMethod: form.paymentMethod,
         note: form.note,
@@ -100,7 +141,8 @@ export function useOrderFinancePage({
 
     setDeleting(true);
     const { kind, payment } = deleteTarget;
-    const response = await fetch(`/api/orders/${orderId}/${kind}-payments/${payment.id}`, {
+    const apiKind = kind === "profit" ? "profit-withdrawals" : `${kind}-payments`;
+    const response = await fetch(`/api/orders/${orderId}/${apiKind}/${payment.id}`, {
       method: "DELETE",
     });
     setDeleting(false);
@@ -117,9 +159,6 @@ export function useOrderFinancePage({
 
   return {
     isPending,
-    tab,
-    setTab,
-    tabs,
     modalKind,
     setModalKind,
     deleteTarget,
@@ -131,7 +170,14 @@ export function useOrderFinancePage({
     errorMessage,
     setErrorMessage,
     canCreateClient,
+    canCreateSupplier,
+    canCreateProfit,
+    canCreateTransaction,
+    availableSupplierCash,
+    availableProfit,
     openCreate,
+    openTransaction,
+    switchCreateKind,
     openEdit,
     savePayment,
     confirmDelete,

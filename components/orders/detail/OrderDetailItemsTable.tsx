@@ -1,15 +1,17 @@
 import { PackageSearch } from "lucide-react";
 import { OrderPartCodeButton } from "@/components/orders/detail/OrderPartCodeButton";
 import type { OrderDetail } from "@/components/orders/types/orderDetailTypes";
+import type { OrderFinanceSummary } from "@/lib/order-finance";
 import { profitClass, toNumber } from "@/components/orders/detail/orderDetailUtils";
 import { PART_TYPES, cn, formatCny } from "@/lib/utils";
 
 interface OrderDetailItemsTableProps {
   order: OrderDetail;
   isAdmin: boolean;
+  financeSummary?: OrderFinanceSummary;
 }
 
-export function OrderDetailItemsTable({ order, isAdmin }: OrderDetailItemsTableProps) {
+export function OrderDetailItemsTable({ order, isAdmin, financeSummary }: OrderDetailItemsTableProps) {
   const duplicateCounts = order.items.reduce((map, item) => {
     map.set(item.partCode, (map.get(item.partCode) ?? 0) + 1);
     return map;
@@ -41,6 +43,37 @@ export function OrderDetailItemsTable({ order, isAdmin }: OrderDetailItemsTableP
           {isAdmin && <SummaryValue label="Foyda" value={formatCny(totalProfit)} tone={totalProfit >= 0 ? "profit" : "cost"} />}
           {isAdmin && <SummaryValue label="Margin" value={`${margin.toFixed(1)}%`} tone={totalProfit >= 0 ? "margin" : "cost"} />}
         </div>
+        {isAdmin && financeSummary && financeSummary.supplierBreakdown.length > 0 && (
+          <div className="mt-4 border-t border-gray-100 pt-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Ta'minotchilar bo'yicha to'lovlar
+            </div>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {financeSummary.supplierBreakdown.map((supplier) => (
+                <div
+                  key={supplier.supplierId ?? "no-supplier"}
+                  className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-semibold text-gray-900">{supplier.supplierName}</span>
+                    <span className={cn("text-xs font-semibold", supplier.supplierBalance > 0 ? "text-red-600" : "text-green-600")}>
+                      {supplier.supplierBalance > 0 ? "qarz" : "to'langan"}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                    <SupplierFinanceMini label="Jami" value={supplier.supplierTotal} />
+                    <SupplierFinanceMini label="To'landi" value={supplier.supplierPaid} className="text-green-700" />
+                    <SupplierFinanceMini
+                      label="Qarz"
+                      value={supplier.supplierBalance}
+                      className={supplier.supplierBalance > 0 ? "text-red-700" : "text-green-700"}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -91,6 +124,15 @@ export function OrderDetailItemsTable({ order, isAdmin }: OrderDetailItemsTableP
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function SupplierFinanceMini({ label, value, className }: { label: string; value: number; className?: string }) {
+  return (
+    <div>
+      <div className="text-[11px] font-medium text-gray-400">{label}</div>
+      <div className={cn("mt-0.5 font-semibold tabular-nums text-gray-900", className)}>{formatCny(value)}</div>
     </div>
   );
 }

@@ -26,6 +26,7 @@ const tableByModel = {
   orderExport: "order_exports",
   clientPayment: "client_payments",
   supplierPayment: "supplier_payments",
+  profitWithdrawal: "profit_withdrawals",
   settingOption: "setting_options",
   partVariant: "part_variants",
   partSupplierPrice: "part_supplier_prices",
@@ -272,13 +273,19 @@ async function selectRows(model: keyof typeof tableByModel, args: AnyRecord = {}
   }
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (model === "profitWithdrawal" && isMissingTableError(error.message)) return [];
+    throw new Error(error.message);
+  }
   return (data ?? []).map((row: AnyRecord) => fromDbRow(row)!);
 }
 
 async function selectAll(model: keyof typeof tableByModel): Promise<AnyRecord[]> {
   const { data, error } = await supabase.from(tableByModel[model]).select("*");
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (model === "profitWithdrawal" && isMissingTableError(error.message)) return [];
+    throw new Error(error.message);
+  }
   return (data ?? []).map((row) => fromDbRow(row)!);
 }
 
@@ -300,8 +307,15 @@ async function selectWhereIn(model: keyof typeof tableByModel, field: string, va
     .from(tableByModel[model])
     .select("*")
     .in(toDbField(field), valueList);
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (model === "profitWithdrawal" && isMissingTableError(error.message)) return [];
+    throw new Error(error.message);
+  }
   return (data ?? []).map((row: AnyRecord) => fromDbRow(row)!);
+}
+
+function isMissingTableError(message = "") {
+  return message.includes("does not exist") || message.includes("Could not find the table");
 }
 
 async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyRecord[], include?: AnyRecord) {
@@ -381,7 +395,7 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
 
   if (model === "order") {
     const userIds = unique(rows.flatMap((row) => [row.createdBy, row.updatedBy]));
-    const [users, customers, items, clientPayments, supplierPayments] = await Promise.all([
+    const [users, customers, items, clientPayments, supplierPayments, profitWithdrawals] = await Promise.all([
       include.creator || include.updater ? selectByIds("user", userIds) : Promise.resolve(new Map()),
       include.customer ? selectByIds("customer", rows.map((row) => row.customerId)) : Promise.resolve(new Map()),
       include._count?.select?.items || include.items
@@ -392,6 +406,9 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
         : Promise.resolve([]),
       include.supplierPayments
         ? selectWhereIn("supplierPayment", "orderId", rows.map((row) => row.id))
+        : Promise.resolve([]),
+      include.profitWithdrawals
+        ? selectWhereIn("profitWithdrawal", "orderId", rows.map((row) => row.id))
         : Promise.resolve([]),
     ]);
     const rowIds = new Set(rows.map((row) => row.id));
@@ -409,6 +426,11 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
     for (const payment of supplierPayments) {
       if (!rowIds.has(payment.orderId)) continue;
       supplierPaymentsByOrder.set(payment.orderId, [...(supplierPaymentsByOrder.get(payment.orderId) ?? []), payment]);
+    }
+    const profitWithdrawalsByOrder = new Map<string, AnyRecord[]>();
+    for (const payment of profitWithdrawals) {
+      if (!rowIds.has(payment.orderId)) continue;
+      profitWithdrawalsByOrder.set(payment.orderId, [...(profitWithdrawalsByOrder.get(payment.orderId) ?? []), payment]);
     }
 
     return rows.map((row) => {
@@ -436,6 +458,9 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
           : {}),
         ...(include.supplierPayments
           ? { supplierPayments: (supplierPaymentsByOrder.get(row.id) ?? []).sort(compareBy(include.supplierPayments.orderBy)) }
+          : {}),
+        ...(include.profitWithdrawals
+          ? { profitWithdrawals: (profitWithdrawalsByOrder.get(row.id) ?? []).sort(compareBy(include.profitWithdrawals.orderBy)) }
           : {}),
         ...(include._count?.select?.items ? { _count: { items: orderItems.length } } : {}),
       };
@@ -513,6 +538,15 @@ async function applyIncludes(model: keyof typeof tableByModel, row: AnyRecord | 
     return next;
   }
 
+  if (model === "profitWithdrawal") {
+    const next = { ...row };
+    if (include.creator) {
+      const creator = row.createdBy ? await prisma.user.findUnique({ where: { id: row.createdBy } }) : null;
+      next.creator = creator && include.creator.select ? pick(creator, include.creator.select) : creator;
+    }
+    return next;
+  }
+
   if (model === "partVariant") {
     const next = { ...row };
     if (include.part) {
@@ -558,6 +592,11 @@ async function applyIncludes(model: keyof typeof tableByModel, row: AnyRecord | 
       next.supplierPayments = (await selectAll("supplierPayment"))
         .filter((payment) => payment.orderId === row.id)
         .sort(compareBy(include.supplierPayments.orderBy));
+    }
+    if (include.profitWithdrawals) {
+      next.profitWithdrawals = (await selectAll("profitWithdrawal"))
+        .filter((payment) => payment.orderId === row.id)
+        .sort(compareBy(include.profitWithdrawals.orderBy));
     }
     if (include.creator) {
       const creator = await users(row.createdBy);
@@ -769,5 +808,6 @@ export const prisma: any = {
   orderExport: modelApi("orderExport"),
   clientPayment: modelApi("clientPayment"),
   supplierPayment: modelApi("supplierPayment"),
+  profitWithdrawal: modelApi("profitWithdrawal"),
   settingOption: modelApi("settingOption"),
 };

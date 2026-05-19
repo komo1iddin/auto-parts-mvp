@@ -29,7 +29,7 @@ export interface PaymentForm {
   note: string;
 }
 
-export type PaymentKind = "client" | "supplier";
+export type PaymentKind = "client" | "supplier" | "refund" | "profit";
 export type FinanceTabKey = "suppliers" | "client" | "supplier";
 
 export interface OrderFinancePageProps {
@@ -38,8 +38,10 @@ export interface OrderFinancePageProps {
   backPath: string;
   isAdmin: boolean;
   canManageClientPayments: boolean;
+  embedded?: boolean;
   summary: OrderFinanceSummary;
   clientPayments: PaymentRecord[];
   supplierPayments: PaymentRecord[];
+  profitWithdrawals: PaymentRecord[];
   suppliers: SupplierOption[];
 }

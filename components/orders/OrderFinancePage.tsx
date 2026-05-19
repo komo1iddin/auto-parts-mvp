@@ -3,10 +3,9 @@
 import { AlertDialog } from "@/components/ui/AlertDialog";
 import { FinancePageHeader } from "@/components/orders/finance/FinancePageHeader";
 import { FinanceSummaryCards } from "@/components/orders/finance/FinanceSummaryCards";
-import { FinanceTabs } from "@/components/orders/finance/FinanceTabs";
 import { PaymentFormModal } from "@/components/orders/finance/PaymentFormModal";
-import { PaymentTable } from "@/components/orders/finance/PaymentTable";
-import { SupplierBreakdownTable } from "@/components/orders/finance/SupplierBreakdownTable";
+import { SupplierSettlementCards } from "@/components/orders/finance/SupplierSettlementCards";
+import { TransactionFeed } from "@/components/orders/finance/TransactionFeed";
 import { useOrderFinancePage } from "@/components/orders/finance/useOrderFinancePage";
 import type { OrderFinancePageProps } from "@/components/orders/types/orderFinanceTypes";
 
@@ -17,9 +16,11 @@ export function OrderFinancePage(props: OrderFinancePageProps) {
     backPath,
     isAdmin,
     canManageClientPayments,
+    embedded = false,
     summary,
     clientPayments,
     supplierPayments,
+    profitWithdrawals,
     suppliers,
   } = props;
   const finance = useOrderFinancePage({
@@ -27,52 +28,42 @@ export function OrderFinancePage(props: OrderFinancePageProps) {
     isAdmin,
     canManageClientPayments,
     suppliers,
+    summary,
   });
 
   return (
     <div className="flex flex-col">
-      <FinancePageHeader
-        orderNumber={orderNumber}
-        backPath={backPath}
-        isAdmin={isAdmin}
-        summary={summary}
-        isPending={finance.isPending}
-      />
+      {!embedded && (
+        <FinancePageHeader
+          orderNumber={orderNumber}
+          backPath={backPath}
+          isAdmin={isAdmin}
+          summary={summary}
+          isPending={finance.isPending}
+        />
+      )}
 
-      <div className="mx-auto w-full max-w-6xl space-y-3 p-6">
+      <div className="mx-auto grid w-full max-w-7xl gap-4 p-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:p-5">
         <FinanceSummaryCards isAdmin={isAdmin} summary={summary} />
-        <FinanceTabs tabs={finance.tabs} activeTab={finance.tab} onChange={finance.setTab} />
-
-        {finance.tab === "suppliers" && isAdmin && (
-          <SupplierBreakdownTable
-            rows={summary.supplierBreakdown}
-            onPaySupplier={(supplierId) => finance.openCreate("supplier", supplierId)}
-          />
-        )}
-
-        {finance.tab === "client" && (
-          <PaymentTable
-            kind="client"
-            payments={clientPayments}
-            canCreate={finance.canCreateClient}
+        <div className="space-y-4">
+          <TransactionFeed
+            clientPayments={clientPayments}
+            supplierPayments={isAdmin ? supplierPayments : []}
+            profitWithdrawals={isAdmin ? profitWithdrawals : []}
+            canCreate={finance.canCreateTransaction}
             canEdit={isAdmin}
-            onCreate={() => finance.openCreate("client")}
-            onEdit={(payment) => finance.openEdit("client", payment)}
-            onDelete={(payment) => finance.setDeleteTarget({ kind: "client", payment })}
+            onCreate={finance.openTransaction}
+            onEdit={finance.openEdit}
+            onDelete={(kind, payment) => finance.setDeleteTarget({ kind, payment })}
           />
-        )}
 
-        {finance.tab === "supplier" && isAdmin && (
-          <PaymentTable
-            kind="supplier"
-            payments={supplierPayments}
-            canCreate={isAdmin && suppliers.length > 0}
-            canEdit={isAdmin}
-            onCreate={() => finance.openCreate("supplier")}
-            onEdit={(payment) => finance.openEdit("supplier", payment)}
-            onDelete={(payment) => finance.setDeleteTarget({ kind: "supplier", payment })}
-          />
-        )}
+          {isAdmin && (
+            <SupplierSettlementCards
+              rows={summary.supplierBreakdown}
+              onPaySupplier={(supplierId) => finance.openCreate("supplier", supplierId)}
+            />
+          )}
+        </div>
       </div>
 
       <PaymentFormModal
@@ -80,10 +71,17 @@ export function OrderFinancePage(props: OrderFinancePageProps) {
         kind={finance.modalKind}
         form={finance.form}
         suppliers={suppliers}
+        supplierBreakdown={summary.supplierBreakdown}
         saving={finance.saving}
+        canChooseClient={finance.canCreateClient}
+        canChooseSupplier={finance.canCreateSupplier}
+        canChooseProfit={finance.canCreateProfit}
+        availableSupplierCash={finance.availableSupplierCash}
+        availableProfit={finance.availableProfit}
         onClose={() => finance.setModalKind(null)}
         onSave={finance.savePayment}
         onFormChange={finance.setForm}
+        onKindChange={finance.switchCreateKind}
       />
 
       <AlertDialog

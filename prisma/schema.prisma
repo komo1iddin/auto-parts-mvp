@@ -21,6 +21,7 @@ model User {
   exports       OrderExport[]
   clientPayments ClientPayment[]
   supplierPayments SupplierPayment[]
+  profitWithdrawals ProfitWithdrawal[]
 
   @@map("users")
 }
@@ -167,6 +168,7 @@ model Order {
   exports   OrderExport[]
   clientPayments ClientPayment[]
   supplierPayments SupplierPayment[]
+  profitWithdrawals ProfitWithdrawal[]
 
   @@index([customerId])
   @@map("orders")
@@ -269,6 +271,23 @@ model SupplierPayment {
   @@index([orderId])
   @@index([supplierId])
   @@map("supplier_payments")
+}
+
+model ProfitWithdrawal {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId       String   @map("order_id") @db.Uuid
+  amountCny     Decimal  @map("amount_cny") @db.Decimal(12, 2)
+  paymentDate   DateTime @map("payment_date") @db.Date
+  paymentMethod String   @map("payment_method")
+  note          String?
+  createdBy     String?  @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  creator User? @relation(fields: [createdBy], references: [id])
+
+  @@index([orderId])
+  @@map("profit_withdrawals")
 }
 
 model AppRealtimeEvent {

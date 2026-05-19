@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { OrderFinanceSummary } from "@/lib/order-finance";
 
 export interface DetailItem {
   id: string;
@@ -49,5 +50,6 @@ export interface OrderDetailViewProps {
   isAdmin: boolean;
   basePath: "/admin/orders" | "/manager/orders";
   exports: ExportRecord[];
+  financeSummary?: OrderFinanceSummary;
   financePanel?: ReactNode;
 }

@@ -35,6 +35,8 @@ export default async function ManagerOrderFinancePage({
     ...finance,
     supplierTotal: 0,
     expectedGrossProfit: 0,
+    profitWithdrawn: 0,
+    profitBalance: 0,
     supplierPaid: 0,
     supplierBalance: 0,
     cashDifference: 0,
@@ -56,6 +58,7 @@ export default async function ManagerOrderFinancePage({
         createdAt: p.createdAt.toISOString(),
       }))}
       supplierPayments={[]}
+      profitWithdrawals={[]}
       suppliers={[]}
     />
   );

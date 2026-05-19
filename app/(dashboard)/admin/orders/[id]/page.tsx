@@ -34,6 +34,10 @@ export default async function AdminOrderDetailPage({
             supplier: { select: { name: true } },
           },
         },
+        profitWithdrawals: {
+          orderBy: { paymentDate: "desc" },
+          include: { creator: { select: { name: true } } },
+        },
       },
     }),
     prisma.orderExport.findMany({
@@ -46,7 +50,11 @@ export default async function AdminOrderDetailPage({
 
   const clientPayments = order.clientPayments ?? [];
   const supplierPayments = order.supplierPayments ?? [];
-  const finance = calculateOrderFinance(order.items ?? [], clientPayments, supplierPayments);
+  const profitWithdrawals = order.profitWithdrawals ?? [];
+  const finance = calculateOrderFinance(order.items ?? [], clientPayments, supplierPayments, profitWithdrawals);
+  const orderSuppliers = finance.supplierBreakdown
+    .filter((supplier): supplier is typeof supplier & { supplierId: string } => Boolean(supplier.supplierId))
+    .map((supplier) => ({ id: supplier.supplierId, name: supplier.supplierName }));
 
   return (
     <OrderDetailView
@@ -54,12 +62,34 @@ export default async function AdminOrderDetailPage({
       exports={exports}
       isAdmin={true}
       basePath="/admin/orders"
+      financeSummary={finance}
       financePanel={
         <OrderFinancePanel
           orderId={order.id}
+          orderNumber={order.currentOrderNumber}
           financePath={`/admin/orders/${order.id}/finance`}
           isAdmin={true}
+          canManageClientPayments={true}
           summary={finance}
+          clientPayments={clientPayments.map((payment) => ({
+            ...payment,
+            amountCny: payment.amountCny.toString(),
+            paymentDate: payment.paymentDate.toISOString(),
+            createdAt: payment.createdAt.toISOString(),
+          }))}
+          supplierPayments={supplierPayments.map((payment) => ({
+            ...payment,
+            amountCny: payment.amountCny.toString(),
+            paymentDate: payment.paymentDate.toISOString(),
+            createdAt: payment.createdAt.toISOString(),
+          }))}
+          profitWithdrawals={profitWithdrawals.map((payment) => ({
+            ...payment,
+            amountCny: payment.amountCny.toString(),
+            paymentDate: payment.paymentDate.toISOString(),
+            createdAt: payment.createdAt.toISOString(),
+          }))}
+          suppliers={orderSuppliers}
         />
       }
     />

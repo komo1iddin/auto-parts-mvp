@@ -23,8 +23,8 @@ export function FinancePageHeader({
   isPending,
 }: FinancePageHeaderProps) {
   return (
-    <div className="sticky top-0 z-20 -mx-6 -mt-6 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
-      <div className="flex items-center gap-3 px-6 py-3">
+    <div className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
+      <div className="flex items-center gap-3 px-4 py-3 lg:px-5">
         <Link
           href={backPath}
           className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-800"

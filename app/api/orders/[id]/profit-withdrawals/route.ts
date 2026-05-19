@@ -21,9 +21,8 @@ export async function POST(
   if (user.role !== "admin") return forbidden();
 
   const { id } = await params;
-  const { amountCny, paymentDate, paymentMethod, note, supplierId } = await req.json();
+  const { amountCny, paymentDate, paymentMethod, note } = await req.json();
   const amount = Number(amountCny);
-  if (!supplierId) return Response.json({ error: "Ta'minotchi majburiy" }, { status: 400 });
   if (!Number.isFinite(amount) || amount <= 0) {
     return Response.json({ error: "To'lov miqdori noto'g'ri" }, { status: 400 });
   }
@@ -33,12 +32,6 @@ export async function POST(
   if (!isValidMethod(paymentMethod)) {
     return Response.json({ error: "To'lov usuli noto'g'ri" }, { status: 400 });
   }
-
-  const [orderSupplier] = await prisma.orderItem.findMany({
-    where: { orderId: id, supplierId },
-    take: 1,
-  });
-  if (!orderSupplier) return forbidden("Bu ta'minotchi buyurtmada yo'q");
 
   const order = await prisma.order.findUnique({
     where: { id },
@@ -52,25 +45,34 @@ export async function POST(
   if (!order) return Response.json({ error: "Topilmadi" }, { status: 404 });
 
   const finance = calculateOrderFinance(order.items, order.clientPayments, order.supplierPayments, order.profitWithdrawals);
-  if (amount > finance.cashDifference) {
+  const availableProfit = Math.max(0, Math.min(finance.cashDifference, finance.profitBalance));
+  if (amount > availableProfit) {
     return Response.json(
-      { error: `Customer cash yetarli emas. Available: ${finance.cashDifference}` },
+      { error: `Olish mumkin bo'lgan foyda yetarli emas. Mavjud: ${availableProfit}` },
       { status: 400 }
     );
   }
 
-  const payment = await prisma.supplierPayment.create({
-    data: {
-      orderId: id,
-      supplierId,
-      amountCny: amount,
-      paymentDate: new Date(paymentDate),
-      paymentMethod,
-      note: note?.trim() || null,
-      createdBy: user.id,
-    },
-  });
+  let withdrawal;
+  try {
+    withdrawal = await prisma.profitWithdrawal.create({
+      data: {
+        orderId: id,
+        amountCny: amount,
+        paymentDate: new Date(paymentDate),
+        paymentMethod,
+        note: note?.trim() || null,
+        createdBy: user.id,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("profit_withdrawals") || message.includes("Could not find the table")) {
+      return Response.json({ error: "profit_withdrawals jadvali hali bazaga qo'llanmagan" }, { status: 500 });
+    }
+    throw error;
+  }
 
   revalidateAppData("orders");
-  return Response.json({ payment }, { status: 201 });
+  return Response.json({ withdrawal }, { status: 201 });
 }

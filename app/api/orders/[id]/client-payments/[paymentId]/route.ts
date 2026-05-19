@@ -39,7 +39,7 @@ export async function PUT(
 
   const { amountCny, paymentDate, paymentMethod, note } = await req.json();
   const amount = Number(amountCny);
-  if (!Number.isFinite(amount) || amount <= 0) {
+  if (!Number.isFinite(amount) || amount === 0) {
     return Response.json({ error: "To'lov miqdori noto'g'ri" }, { status: 400 });
   }
   if (!paymentDate || Number.isNaN(new Date(paymentDate).getTime())) {
