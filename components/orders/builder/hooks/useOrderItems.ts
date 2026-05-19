@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { OrderItem, PartSearchResult } from "@/components/orders/types/orderBuilderTypes";
-import { buildOrderItem } from "@/components/orders/builder/orderBuilderUtils";
+import { buildOrderItem } from "@/components/orders/builder/utils/orderBuilderUtils";
 
 function itemKey(item: OrderItem) {
   return item.id ?? item.partVariantId ?? item.partId ?? item.localId ?? item.partCode;

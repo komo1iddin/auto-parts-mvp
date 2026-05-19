@@ -11,10 +11,10 @@ import {
   getDuplicateCodes,
   getOrderTotals,
   serializeItems,
-} from "@/components/orders/builder/orderBuilderUtils";
-import { useOrderItems } from "@/components/orders/builder/useOrderItems";
-import { usePartSearch } from "@/components/orders/builder/usePartSearch";
-import { useUnsavedOrderNavigation } from "@/components/orders/builder/useUnsavedOrderNavigation";
+} from "@/components/orders/builder/utils/orderBuilderUtils";
+import { useOrderItems } from "@/components/orders/builder/hooks/useOrderItems";
+import { usePartSearch } from "@/components/orders/builder/hooks/usePartSearch";
+import { useUnsavedOrderNavigation } from "@/components/orders/builder/hooks/useUnsavedOrderNavigation";
 
 interface UseOrderBuilderArgs {
   existingOrder?: {

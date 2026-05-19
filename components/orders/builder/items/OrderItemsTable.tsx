@@ -1,7 +1,7 @@
 "use client";
 
-import { OrderItemsTableRow } from "@/components/orders/builder/OrderItemsTableRow";
-import { TableSelect } from "@/components/orders/builder/OrderTableControls";
+import { OrderItemsTableRow } from "@/components/orders/builder/items/OrderItemsTableRow";
+import { TableSelect } from "@/components/orders/builder/items/OrderTableControls";
 import type { OrderItem, SettingOption, Supplier } from "@/components/orders/types/orderBuilderTypes";
 import { PART_TYPES } from "@/lib/utils";
 

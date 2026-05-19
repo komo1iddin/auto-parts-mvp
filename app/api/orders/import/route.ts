@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { requireAdminOrManager, unauthorized } from "@/lib/auth";
+import { parseClipboardOrderText } from "./_lib/clipboard";
 import { finalizeImport } from "./_lib/service";
 import { parseWorkbook } from "./_lib/workbook";
 
@@ -28,6 +29,15 @@ function isJsonRequest(req: NextRequest) {
 
 async function importResolvedRows(req: NextRequest) {
   const body = await req.json();
+  if (typeof body.text === "string") {
+    const parsedRows = parseClipboardOrderText(body.text);
+    if (!parsedRows.length) {
+      return Response.json({ error: "Clipboard matnidan part number, narx va son topilmadi" }, { status: 400 });
+    }
+
+    return Response.json(await finalizeImport(parsedRows));
+  }
+
   if (!Array.isArray(body.rows)) {
     return Response.json({ error: "Import qatorlari yuborilmadi" }, { status: 400 });
   }

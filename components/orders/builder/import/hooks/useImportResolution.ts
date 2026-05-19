@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { PendingResolution } from "@/components/orders/builder/ImportResolutionModal";
 import type { OrderItem } from "@/components/orders/types/orderBuilderTypes";
+import type { PendingResolution, SupplierOption } from "../types";
 
 type ResolutionState = {
   types: Record<string, string>;
@@ -19,18 +19,21 @@ function numberOrNull(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function useImportResolution(suppliers: { id: string; name: string }[]) {
+export function useImportResolution(suppliers: SupplierOption[]) {
   const [pending, setPending] = useState<PendingResolution | null>(null);
   const [state, setState] = useState<ResolutionState>(EMPTY);
 
   function open(data: PendingResolution) {
     setPending(data);
     setState((prev) => {
-      const types: Record<string, string> = {};
-      const prices: Record<string, { purchasePriceCny: string; sellingPriceCny: string }> = {};
-      const supplierIds: Record<string, string> = {};
+      const types: ResolutionState["types"] = {};
+      const prices: ResolutionState["prices"] = {};
+      const supplierIds: ResolutionState["supplierIds"] = {};
+
       for (const issue of data.issues) {
-        const knownExisting = data.typeOptions.some((o) => o.value === issue.existingType) ? issue.existingType : "";
+        const knownExisting = data.typeOptions.some((option) => option.value === issue.existingType)
+          ? issue.existingType
+          : "";
         types[issue.rowKey] = prev.types[issue.rowKey] || knownExisting;
         prices[issue.rowKey] = prev.prices[issue.rowKey] ?? {
           purchasePriceCny: issue.purchasePriceCny == null ? "" : String(issue.purchasePriceCny),
@@ -38,6 +41,7 @@ export function useImportResolution(suppliers: { id: string; name: string }[]) {
         };
         supplierIds[issue.rowKey] = prev.supplierIds[issue.rowKey] ?? "";
       }
+
       return { ...prev, types, prices, supplierIds };
     });
   }
@@ -49,35 +53,8 @@ export function useImportResolution(suppliers: { id: string; name: string }[]) {
 
   function applyBulkSupplier() {
     if (!state.bulkSupplierId || !pending) return;
-    const supplierIds: Record<string, string> = {};
-    for (const issue of pending.issues) supplierIds[issue.rowKey] = state.bulkSupplierId;
+    const supplierIds = Object.fromEntries(pending.issues.map((issue) => [issue.rowKey, state.bulkSupplierId]));
     setState((prev) => ({ ...prev, supplierIds }));
-  }
-
-  function setType(rowKey: string, type: string) {
-    setState((prev) => ({ ...prev, types: { ...prev.types, [rowKey]: type } }));
-  }
-
-  function setPrice(rowKey: string, field: "purchasePriceCny" | "sellingPriceCny", value: string) {
-    setState((prev) => ({
-      ...prev,
-      prices: {
-        ...prev.prices,
-        [rowKey]: {
-          purchasePriceCny: prev.prices[rowKey]?.purchasePriceCny ?? "",
-          sellingPriceCny: prev.prices[rowKey]?.sellingPriceCny ?? "",
-          [field]: value,
-        },
-      },
-    }));
-  }
-
-  function setSupplierId(rowKey: string, id: string) {
-    setState((prev) => ({ ...prev, supplierIds: { ...prev.supplierIds, [rowKey]: id } }));
-  }
-
-  function setBulkSupplierId(id: string) {
-    setState((prev) => ({ ...prev, bulkSupplierId: id }));
   }
 
   function buildResolutions() {
@@ -106,11 +83,24 @@ export function useImportResolution(suppliers: { id: string; name: string }[]) {
     open,
     reset,
     applyBulkSupplier,
-    setType,
-    setPrice,
-    setSupplierId,
-    setBulkSupplierId,
     buildResolutions,
     resolveItemSupplier,
+    setBulkSupplierId: (id: string) => setState((prev) => ({ ...prev, bulkSupplierId: id })),
+    setSupplierId: (rowKey: string, id: string) =>
+      setState((prev) => ({ ...prev, supplierIds: { ...prev.supplierIds, [rowKey]: id } })),
+    setType: (rowKey: string, type: string) =>
+      setState((prev) => ({ ...prev, types: { ...prev.types, [rowKey]: type } })),
+    setPrice: (rowKey: string, field: "purchasePriceCny" | "sellingPriceCny", value: string) =>
+      setState((prev) => ({
+        ...prev,
+        prices: {
+          ...prev.prices,
+          [rowKey]: {
+            purchasePriceCny: prev.prices[rowKey]?.purchasePriceCny ?? "",
+            sellingPriceCny: prev.prices[rowKey]?.sellingPriceCny ?? "",
+            [field]: value,
+          },
+        },
+      })),
   };
 }

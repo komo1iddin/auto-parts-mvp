@@ -1,12 +1,12 @@
 "use client";
 
-import { OrderBuilderBar } from "@/components/orders/builder/OrderBuilderBar";
-import { OrderExcelImport } from "@/components/orders/builder/OrderExcelImport";
-import { OrderBuilderModals } from "@/components/orders/builder/OrderBuilderModals";
-import { OrderBuilderOptions } from "@/components/orders/builder/OrderBuilderOptions";
-import { OrderItemsTable } from "@/components/orders/builder/OrderItemsTable";
-import { OrderPartSearch } from "@/components/orders/builder/OrderPartSearch";
-import { useOrderBuilder } from "@/components/orders/builder/useOrderBuilder";
+import { OrderBuilderBar } from "@/components/orders/builder/actions/OrderBuilderBar";
+import { OrderBuilderModals } from "@/components/orders/builder/modals/OrderBuilderModals";
+import { OrderBuilderOptions } from "@/components/orders/builder/options/OrderBuilderOptions";
+import { OrderItemsTable } from "@/components/orders/builder/items/OrderItemsTable";
+import { OrderPartSearch } from "@/components/orders/builder/search/OrderPartSearch";
+import { OrderImportPanel } from "@/components/orders/builder/import/OrderImportPanel";
+import { useOrderBuilder } from "@/components/orders/builder/hooks/useOrderBuilder";
 import type { OrderItem } from "@/components/orders/types/orderBuilderTypes";
 
 interface OrderBuilderProps {
@@ -26,7 +26,7 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = 
 
   return (
     <div className="space-y-6">
-      <OrderExcelImport onImportItems={builder.addImportedItems} suppliers={builder.suppliers} />
+      <OrderImportPanel onImportItems={builder.addImportedItems} suppliers={builder.suppliers} />
 
       <OrderPartSearch
         query={builder.q}

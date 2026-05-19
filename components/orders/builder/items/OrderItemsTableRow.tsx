@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { TableInput, TableSelect } from "@/components/orders/builder/OrderTableControls";
+import { TableInput, TableSelect } from "@/components/orders/builder/items/OrderTableControls";
 import type { OrderItem, Supplier } from "@/components/orders/types/orderBuilderTypes";
 import { cn } from "@/lib/utils";
 
