@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { OrdersListHeader } from "@/components/orders/list/OrdersListHeader";
 import { OrdersListToolbar } from "@/components/orders/list/OrdersListToolbar";
 import { OrdersTable } from "@/components/orders/list/OrdersTable";
@@ -21,12 +21,28 @@ export function OrdersList({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
+  const [currentStatus, setCurrentStatus] = useState(status);
   const isAdmin = basePath.startsWith("/admin");
-  const filtered = search.trim() ? orders.filter((order) => orderMatchesSearch(order, search)) : orders;
+  const filtered = useMemo(() => {
+    const byStatus = currentStatus ? orders.filter((order) => order.status === currentStatus) : orders;
+    return search.trim() ? byStatus.filter((order) => orderMatchesSearch(order, search)) : byStatus;
+  }, [orders, currentStatus, search]);
+
+  useEffect(() => {
+    function syncStatusFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      setCurrentStatus(params.get("status") ?? "");
+    }
+
+    syncStatusFromUrl();
+    window.addEventListener("popstate", syncStatusFromUrl);
+    return () => window.removeEventListener("popstate", syncStatusFromUrl);
+  }, []);
 
   function setOrderStatus(nextStatus: string) {
+    setCurrentStatus(nextStatus);
     const href = nextStatus ? `${basePath}?status=${nextStatus}` : basePath;
-    startTransition(() => router.push(href));
+    window.history.pushState(null, "", href);
   }
 
   async function cancelOrder(order: OrderListItem) {
@@ -42,9 +58,9 @@ export function OrdersList({
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <OrdersListToolbar
           status={status}
+          activeStatus={currentStatus}
           statusCounts={statusCounts}
           search={search}
-          isPending={isPending}
           onStatusChange={setOrderStatus}
           onSearchChange={setSearch}
         />

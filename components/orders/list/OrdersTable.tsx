@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { X, PackageSearch } from "lucide-react";
 import type { OrderListItem } from "@/components/orders/types/ordersListTypes";
-import { ORDER_STATUSES, formatCny } from "@/lib/utils";
+import { ORDER_STATUSES, cn, formatCny } from "@/lib/utils";
 
 interface OrdersTableProps {
   orders: OrderListItem[];
@@ -23,26 +23,40 @@ export function OrdersTable({
   onCancelOrder,
 }: OrdersTableProps) {
   return (
-    <div className={`overflow-x-auto transition-opacity ${isPending ? "opacity-50 pointer-events-none" : ""}`}>
-      <table className="w-full text-sm">
+    <div className={`overflow-x-auto transition-opacity ${isPending ? "opacity-60 pointer-events-none" : ""}`}>
+      <table className="w-full min-w-[1180px] table-fixed text-sm">
+        <colgroup>
+          <col className="w-[170px]" />
+          <col className="w-[150px]" />
+          <col className="w-[170px]" />
+          <col className="w-[74px]" />
+          <col className="w-[88px]" />
+          <col className="w-[96px]" />
+          {isAdmin && <col className="w-[130px]" />}
+          <col className="w-[130px]" />
+          <col className="w-[150px]" />
+          {canShowCreator && <col className="w-[106px]" />}
+          <col className="w-[116px]" />
+          <col className="w-[52px]" />
+        </colgroup>
         <thead>
-          <tr className="border-b border-gray-100 bg-gray-50/70">
-            <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">Raqam</th>
-            <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">Mijoz</th>
-            <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">Holat</th>
-            <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">Ver.</th>
-            <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-400">Qismlar</th>
-            <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-400">Miqdor</th>
+          <tr className="border-b border-slate-200 bg-slate-50/80">
+            <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">Raqam</th>
+            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Mijoz</th>
+            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Holat</th>
+            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Ver.</th>
+            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Qismlar</th>
+            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Miqdor</th>
             {isAdmin && (
-              <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-400">Xarid</th>
+              <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Xarid</th>
             )}
-            <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-400">Sotuv</th>
-            <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">Ta'minotchi</th>
+            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Sotuv</th>
+            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Ta'minotchi</th>
             {canShowCreator && (
-              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">Yaratdi</th>
+              <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Yaratdi</th>
             )}
-            <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">Sana</th>
-            <th className="w-10 px-4 py-2.5" />
+            <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">Sana</th>
+            <th className="px-4 py-3" />
           </tr>
         </thead>
         <tbody>
@@ -85,50 +99,56 @@ function OrdersTableRow({
   return (
     <tr
       onClick={() => router.push(href)}
-      className="group cursor-pointer border-b border-gray-50 transition-colors hover:bg-blue-50/40"
+      className="group cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50"
     >
-      <td className="px-4 py-3">
-        <span className="font-mono text-xs font-semibold text-blue-600 group-hover:underline">
+      <td className="px-4 py-3.5 align-middle">
+        <span className="font-mono text-xs font-semibold text-blue-700 group-hover:underline">
           {order.currentOrderNumber}
         </span>
       </td>
-      <td className="max-w-[140px] truncate px-4 py-3 text-xs font-medium text-gray-700">
-        {order.customer?.name ?? <span className="text-gray-300">—</span>}
+      <td className="px-4 py-3.5 text-center align-middle text-xs font-semibold text-slate-700">
+        <span className="mx-auto block max-w-[126px] truncate">
+          {order.customer?.name ?? <span className="text-slate-400">—</span>}
+        </span>
       </td>
-      <td className="px-4 py-3">
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${status?.color ?? "bg-gray-100 text-gray-600"}`}>
+      <td className="px-4 py-3.5 text-center align-middle">
+        <span className={cn("inline-flex max-w-full items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-semibold", getOrderStatusTone(order.status, status?.color))}>
           {status?.label ?? order.status}
         </span>
       </td>
-      <td className="px-4 py-3">
-        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-500">
+      <td className="px-4 py-3.5 text-center align-middle">
+        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600">
           V{order.version}
         </span>
       </td>
-      <td className="px-4 py-3 text-right text-xs tabular-nums text-gray-600">{order._count.items}</td>
-      <td className="px-4 py-3 text-right text-xs tabular-nums text-gray-600">{order.totalQty ?? "—"}</td>
+      <td className="px-4 py-3.5 text-center text-xs font-semibold tabular-nums text-slate-700">{order._count.items}</td>
+      <td className="px-4 py-3.5 text-center text-xs font-semibold tabular-nums text-slate-700">{order.totalQty ?? "—"}</td>
       {isAdmin && (
-        <td className="px-4 py-3 text-right text-xs tabular-nums font-medium text-red-600">
-          {order.totalPurchase != null ? formatCny(order.totalPurchase) : <span className="text-gray-300">—</span>}
+        <td className="px-4 py-3.5 text-center text-xs tabular-nums font-semibold text-red-700">
+          {order.totalPurchase != null ? <span className="whitespace-nowrap">{formatCny(order.totalPurchase)}</span> : <span className="text-slate-400">—</span>}
         </td>
       )}
-      <td className="px-4 py-3 text-right text-xs tabular-nums font-medium text-emerald-600">
-        {order.totalSelling != null ? formatCny(order.totalSelling) : <span className="text-gray-300">—</span>}
+      <td className="px-4 py-3.5 text-center text-xs tabular-nums font-semibold text-emerald-700">
+        {order.totalSelling != null ? <span className="whitespace-nowrap">{formatCny(order.totalSelling)}</span> : <span className="text-slate-400">—</span>}
       </td>
-      <td className="max-w-[130px] truncate px-4 py-3 text-xs text-gray-500">
-        {order.supplierNames?.length ? order.supplierNames.join(", ") : <span className="text-gray-300">—</span>}
+      <td className="px-4 py-3.5 text-center align-middle text-xs font-medium text-slate-600">
+        <span className="mx-auto block max-w-[126px] truncate">
+          {order.supplierNames?.length ? order.supplierNames.join(", ") : <span className="text-slate-400">—</span>}
+        </span>
       </td>
       {canShowCreator && (
-        <td className="px-4 py-3 text-xs text-gray-500">{order.creator?.name ?? "—"}</td>
+        <td className="px-4 py-3.5 text-center text-xs font-medium text-slate-600">{order.creator?.name ?? "—"}</td>
       )}
-      <td className="px-4 py-3 text-xs tabular-nums text-gray-400">{dateStr}</td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-4 py-3.5 text-left text-xs font-medium tabular-nums text-slate-600">
+        <span className="whitespace-nowrap">{dateStr}</span>
+      </td>
+      <td className="px-4 py-3.5 text-right">
         {order.status !== "cancelled" && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onCancelOrder(order); }}
             title="Bekor qilish"
-            className="rounded p-1 text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-50 hover:text-red-500"
+            className="rounded p-1 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-50 hover:text-red-600"
           >
             <X size={14} />
           </button>
@@ -138,15 +158,34 @@ function OrdersTableRow({
   );
 }
 
+function getOrderStatusTone(status: string, fallback?: string) {
+  const tones: Record<string, string> = {
+    draft: "bg-slate-100 text-slate-700",
+    calculating: "bg-blue-50 text-blue-700",
+    confirmed: "bg-emerald-50 text-emerald-700",
+    supplier_ordered: "bg-cyan-50 text-cyan-800",
+    partially_paid: "bg-amber-50 text-amber-800",
+    paid: "bg-emerald-50 text-emerald-800",
+    shipped: "bg-indigo-50 text-indigo-700",
+    arrived: "bg-violet-50 text-violet-700",
+    closed: "bg-slate-200 text-slate-700",
+    problem: "bg-red-50 text-red-700",
+    updated: "bg-sky-50 text-sky-700",
+    cancelled: "bg-red-50 text-red-700",
+  };
+
+  return tones[status] ?? fallback ?? "bg-slate-100 text-slate-700";
+}
+
 function EmptyState({ isAdmin, canShowCreator }: { isAdmin: boolean; canShowCreator: boolean }) {
-  const colSpan = 7 + (isAdmin ? 1 : 0) + (canShowCreator ? 1 : 0) + 1;
+  const colSpan = 10 + (isAdmin ? 1 : 0) + (canShowCreator ? 1 : 0);
   return (
     <tr>
       <td colSpan={colSpan} className="px-4 py-16 text-center">
-        <div className="flex flex-col items-center gap-3 text-gray-400">
+        <div className="flex flex-col items-center gap-3 text-slate-400">
           <PackageSearch size={36} strokeWidth={1.2} />
           <p className="text-sm font-medium">Buyurtmalar yo'q</p>
-          <p className="text-xs text-gray-300">Filterni o'zgartiring yoki yangi buyurtma yarating</p>
+          <p className="text-xs text-slate-400">Filterni o'zgartiring yoki yangi buyurtma yarating</p>
         </div>
       </td>
     </tr>

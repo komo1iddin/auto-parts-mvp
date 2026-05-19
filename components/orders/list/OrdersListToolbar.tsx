@@ -5,9 +5,9 @@ import { ORDER_STATUS_OPTIONS, ORDER_STATUSES } from "@/lib/utils";
 
 interface OrdersListToolbarProps {
   status: string;
+  activeStatus?: string;
   statusCounts?: Record<string, number>;
   search: string;
-  isPending: boolean;
   onStatusChange: (status: string) => void;
   onSearchChange: (search: string) => void;
 }
@@ -19,9 +19,9 @@ const ALL_TABS = [
 
 export function OrdersListToolbar({
   status,
+  activeStatus = status,
   statusCounts,
   search,
-  isPending,
   onStatusChange,
   onSearchChange,
 }: OrdersListToolbarProps) {
@@ -32,23 +32,23 @@ export function OrdersListToolbar({
           <div className="flex gap-0.5">
             {ALL_TABS.map((tab) => {
               const count = statusCounts?.[tab.value];
-              const isActive = status === tab.value;
+              const isActive = activeStatus === tab.value;
               return (
                 <button
                   key={tab.value}
                   type="button"
                   onClick={() => onStatusChange(tab.value)}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
+                  className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
                     isActive
-                      ? "bg-gray-900 text-white"
-                      : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   }`}
                 >
                   {tab.label}
                   {count != null && count > 0 && (
                     <span
                       className={`rounded-full px-1.5 py-px text-[10px] font-semibold leading-none tabular-nums ${
-                        isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                        isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
                       }`}
                     >
                       {count}
@@ -67,13 +67,9 @@ export function OrdersListToolbar({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Qidirish..."
-            className="h-8 w-48 rounded-md border border-gray-200 bg-gray-50 pl-8 pr-3 text-xs outline-none transition focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 placeholder:text-gray-400"
+            className="h-8 w-52 rounded-md border border-slate-200 bg-slate-50 pl-8 pr-3 text-xs font-medium text-slate-700 outline-none transition focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100 placeholder:text-slate-400"
           />
         </div>
-
-        {isPending && (
-          <span className="shrink-0 text-xs text-gray-400">Yangilanmoqda...</span>
-        )}
       </div>
     </div>
   );

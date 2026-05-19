@@ -9,7 +9,7 @@ export default async function ManagerOrdersPage({
 }) {
   const [user, params] = await Promise.all([getAuthUser(), searchParams]);
   const status = params?.status ?? "";
-  const { orders, total, statusCounts } = await getOrdersList("manager", user!.id, status, 100);
+  const { orders, total, statusCounts } = await getOrdersList("manager", user!.id, "", 100);
 
   return (
     <OrdersList

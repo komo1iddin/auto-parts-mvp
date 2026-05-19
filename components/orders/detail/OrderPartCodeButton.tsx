@@ -109,11 +109,16 @@ function buildFallbackPart(item: DetailItem): PartDetailsData {
     name: item.partName,
     brand: null,
     type: item.type ?? "original",
-    purchasePriceCny: item.purchasePriceCny ?? null,
-    sellingPriceCny: item.sellingPriceCny ?? null,
+    purchasePriceCny: toPartDetailsMoney(item.purchasePriceCny),
+    sellingPriceCny: toPartDetailsMoney(item.sellingPriceCny),
     wholesalePriceCny: null,
     imageUrl: null,
     note: item.note,
     supplier: item.supplierName ? { name: item.supplierName } : null,
   };
+}
+
+function toPartDetailsMoney(value: DetailItem["purchasePriceCny"]) {
+  if (value == null || typeof value === "string" || typeof value === "number") return value ?? null;
+  return value.toString();
 }

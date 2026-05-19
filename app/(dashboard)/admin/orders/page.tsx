@@ -8,7 +8,7 @@ export default async function AdminOrdersPage({
 }) {
   const params = await searchParams;
   const status = params?.status ?? "";
-  const { orders, total, statusCounts } = await getOrdersList("admin", "", status, 100);
+  const { orders, total, statusCounts } = await getOrdersList("admin", "", "", 100);
 
   return (
     <OrdersList
