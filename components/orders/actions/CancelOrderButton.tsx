@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { markLocalMutation } from "@/lib/client/local-mutation";
 
 interface CancelOrderButtonProps {
   orderId: string;
@@ -18,7 +19,9 @@ export function CancelOrderButton({ orderId, orderNumber, size = "md" }: CancelO
   const [isPending, startTransition] = useTransition();
 
   async function cancelOrder() {
+    markLocalMutation();
     await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
+    markLocalMutation();
     setOpen(false);
     startTransition(() => router.refresh());
   }

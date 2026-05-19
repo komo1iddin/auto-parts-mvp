@@ -1,4 +1,5 @@
 import type { ExistingOrderItem, IncomingOrderItem } from "./order-types";
+import { clampShippedQuantity, getFulfillmentStatus } from "@/lib/order-fulfillment";
 
 function numberOrPrevious(value: unknown, previous: unknown) {
   if (value != null && value !== "") return Number(value);
@@ -45,6 +46,12 @@ export function buildReplacementItems(items: IncomingOrderItem[], existingItems:
     const previous = findPreviousItem(item, existingItems, usedExistingIds);
     if (previous) usedExistingIds.add(previous.id);
 
+    const quantity = Math.max(1, Math.floor(Number(item.quantity) || previous?.quantity || 1));
+    const shippedQuantity = clampShippedQuantity(
+      item.shippedQuantity ?? previous?.shippedQuantity ?? 0,
+      quantity
+    );
+
     return {
       partId: item.partId || previous?.partId || null,
       partVariantId: item.partVariantId || previous?.partVariantId || null,
@@ -59,7 +66,9 @@ export function buildReplacementItems(items: IncomingOrderItem[], existingItems:
       sellingPriceCny: numberOrPrevious(item.sellingPriceCny, previous?.sellingPriceCny),
       supplierId: stringOrPrevious(item.supplierId, previous?.supplierId),
       supplierName: stringOrPrevious(item.supplierName, previous?.supplierName),
-      quantity: Number(item.quantity) || previous?.quantity || 1,
+      quantity,
+      shippedQuantity,
+      fulfillmentStatus: getFulfillmentStatus(quantity, shippedQuantity),
       note: item.note || previous?.note || null,
     };
   });

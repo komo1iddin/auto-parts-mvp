@@ -6,6 +6,7 @@ import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { markLocalMutation } from "@/lib/client/local-mutation";
 
 interface OrderTitleEditorProps {
   orderId: string;
@@ -36,6 +37,7 @@ export function OrderTitleEditor({ orderId, title }: OrderTitleEditorProps) {
       return;
     }
 
+    markLocalMutation();
     const res = await fetch(`/api/orders/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -47,6 +49,7 @@ export function OrderTitleEditor({ orderId, title }: OrderTitleEditorProps) {
       return;
     }
 
+    markLocalMutation();
     setOpen(false);
     startTransition(() => router.refresh());
   }

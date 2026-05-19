@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { OrderBuilder } from "@/components/orders/OrderBuilder";
+import { getOrderDetailFast } from "@/lib/order-detail-query";
 
 export default async function EditOrderPage({
   params,
@@ -9,10 +9,7 @@ export default async function EditOrderPage({
 }) {
   const { id } = await params;
 
-  const order = await prisma.order.findUnique({
-    where: { id },
-    include: { items: { orderBy: { partCode: "asc" } } },
-  });
+  const order = await getOrderDetailFast(id);
 
   if (!order) notFound();
   if (order.status === "cancelled") {
@@ -52,6 +49,8 @@ export default async function EditOrderPage({
             supplierId: i.supplierId ?? "",
             supplierName: i.supplierName ?? "",
             quantity: i.quantity,
+            shippedQuantity: i.shippedQuantity ?? 0,
+            fulfillmentStatus: i.fulfillmentStatus ?? "waiting",
             note: i.note ?? "",
           })),
         }}

@@ -7,12 +7,17 @@ export interface DetailItem {
   partVariantId?: string | null;
   partCode: string;
   partName: string | null;
+  categoryName?: string | null;
+  brand?: string | null;
   type: string | null;
   purchasePriceCny?: { toString(): string } | number | string | null;
+  wholesalePriceCny?: { toString(): string } | number | string | null;
   sellingPriceCny?: { toString(): string } | number | string | null;
   supplierId?: string | null;
   supplierName?: string | null;
   quantity: number;
+  shippedQuantity?: number | null;
+  fulfillmentStatus?: string | null;
   note: string | null;
 }
 

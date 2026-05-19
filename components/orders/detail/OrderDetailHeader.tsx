@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CalendarClock, Pencil, UserRound } from "lucide-react";
+import { CalendarClock, Pencil, Truck, UserPen, UserRound, UserRoundCog } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { CancelOrderButton } from "@/components/orders/actions/CancelOrderButton";
 import { ExportButtons } from "@/components/orders/actions/ExportButtons";
@@ -67,13 +67,14 @@ export function OrderDetailHeader({
       <div className="grid gap-px bg-gray-100 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <MetaItem label="Yaratilgan" value={formatDateTime(order.createdAt)} icon={<CalendarClock className="size-4" />} />
         <MetaItem label="Mijoz" value={order.customer?.name ?? "—"} icon={<UserRound className="size-4" />} strong />
-        <MetaItem label="Oxirgi tahrir" value={formatDateTime(order.updatedAt)} />
-        <MetaItem label="Yaratdi" value={order.creator?.name ?? "—"} />
-        <MetaItem label="Tahrirladi" value={order.updater?.name ?? "—"} />
+        <MetaItem label="Oxirgi tahrir" value={formatDateTime(order.updatedAt)} icon={<CalendarClock className="size-4" />} />
+        <MetaItem label="Yaratdi" value={order.creator?.name ?? "—"} icon={<UserPen className="size-4" />} />
+        <MetaItem label="Tahrirladi" value={order.updater?.name ?? "—"} icon={<UserRoundCog className="size-4" />} />
         <MetaItem
           label="Ta'minotchi"
           value={supplierNames.length ? supplierNames.join(", ") : "—"}
           title={supplierNames.join(", ")}
+          icon={<Truck className="size-4" />}
         />
       </div>
     </div>

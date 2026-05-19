@@ -8,6 +8,7 @@ export interface OrderListItem {
   creator?: { name: string } | null;
   _count: { items: number };
   totalQty?: number;
+  shippedQty?: number;
   totalPurchase?: number;
   totalSelling?: number;
   supplierNames?: (string | null)[];

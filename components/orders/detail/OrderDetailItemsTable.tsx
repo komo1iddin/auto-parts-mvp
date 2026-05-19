@@ -1,9 +1,17 @@
 import { PackageSearch } from "lucide-react";
+import { OrderFulfillmentBatchModal } from "@/components/orders/detail/OrderFulfillmentBatchModal";
+import { OrderMetric, OrderMetricStrip, OrderSection } from "@/components/orders/detail/OrderSection";
 import { OrderPartCodeButton } from "@/components/orders/detail/OrderPartCodeButton";
 import type { OrderDetail } from "@/components/orders/types/orderDetailTypes";
 import type { OrderFinanceSummary } from "@/lib/order-finance";
 import { profitClass, toNumber } from "@/components/orders/detail/orderDetailUtils";
 import { PART_TYPES, cn, formatCny } from "@/lib/utils";
+import {
+  ORDER_ITEM_FULFILLMENT_LABELS,
+  ORDER_ITEM_FULFILLMENT_STYLES,
+  getFulfillmentStatus,
+  getOrderFulfillmentSummary,
+} from "@/lib/order-fulfillment";
 
 interface OrderDetailItemsTableProps {
   order: OrderDetail;
@@ -16,67 +24,65 @@ export function OrderDetailItemsTable({ order, isAdmin, financeSummary }: OrderD
     map.set(item.partCode, (map.get(item.partCode) ?? 0) + 1);
     return map;
   }, new Map<string, number>());
-  const itemCount = order.items.length;
   const totalQty = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPurchase = order.items.reduce((sum, item) => sum + toNumber(item.purchasePriceCny) * item.quantity, 0);
   const totalSelling = order.items.reduce((sum, item) => sum + toNumber(item.sellingPriceCny) * item.quantity, 0);
   const totalProfit = totalSelling - totalPurchase;
   const margin = totalSelling > 0 ? (totalProfit / totalSelling) * 100 : 0;
+  const fulfillment = getOrderFulfillmentSummary(order.items);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <div className="border-b border-gray-100 px-5 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600">
-              <PackageSearch className="size-4" />
-            </span>
-            <h2 className="text-base font-semibold text-gray-950">Buyurtma qismlari</h2>
-          </div>
-          <span className="text-sm text-gray-500">{itemCount} ta qism</span>
-        </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <SummaryValue label="Qismlar" value={itemCount} tone="neutral" />
-          <SummaryValue label="Miqdor" value={totalQty} tone="neutral" />
-          {isAdmin && <SummaryValue label="Xarid jami" value={formatCny(totalPurchase)} tone="cost" />}
-          <SummaryValue label="Sotuv jami" value={formatCny(totalSelling)} tone="revenue" />
-          {isAdmin && <SummaryValue label="Foyda" value={formatCny(totalProfit)} tone={totalProfit >= 0 ? "profit" : "cost"} />}
-          {isAdmin && <SummaryValue label="Margin" value={`${margin.toFixed(1)}%`} tone={totalProfit >= 0 ? "margin" : "cost"} />}
-        </div>
+    <OrderSection
+      icon={<PackageSearch className="size-4" />}
+      title="Buyurtma qismlari"
+      action={(
+        <OrderFulfillmentBatchModal
+          orderId={order.id}
+          disabled={order.status === "cancelled"}
+          items={order.items.map((item) => ({
+            id: item.id,
+            partCode: item.partCode,
+            partName: item.partName,
+            quantity: item.quantity,
+            shippedQuantity: Math.min(Math.max(0, item.shippedQuantity ?? 0), item.quantity),
+          }))}
+        />
+      )}
+    >
+        <OrderMetricStrip>
+          <OrderMetric label="Miqdor" value={totalQty} />
+          <OrderMetric
+            label="Chiqqan"
+            value={`${fulfillment.shippedQty}/${fulfillment.totalQty}`}
+            valueClassName={fulfillment.status === "shipped" ? "text-emerald-700" : fulfillment.status === "partial" ? "text-amber-700" : undefined}
+          />
+          {isAdmin && <OrderMetric label="Xarid" value={formatCny(totalPurchase)} valueClassName="text-red-700" />}
+          <OrderMetric label="Sotuv" value={formatCny(totalSelling)} valueClassName="text-blue-700" />
+          {isAdmin && <OrderMetric label="Foyda" value={formatCny(totalProfit)} valueClassName={totalProfit >= 0 ? "text-emerald-700" : "text-red-700"} />}
+          {isAdmin && <OrderMetric label="Margin" value={`${margin.toFixed(1)}%`} valueClassName={totalProfit >= 0 ? "text-violet-700" : "text-red-700"} />}
+        </OrderMetricStrip>
         {isAdmin && financeSummary && financeSummary.supplierBreakdown.length > 0 && (
-          <div className="mt-4 border-t border-gray-100 pt-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-              Ta'minotchilar bo'yicha to'lovlar
-            </div>
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Ta'minotchilar</span>
               {financeSummary.supplierBreakdown.map((supplier) => (
-                <div
+                <span
                   key={supplier.supplierId ?? "no-supplier"}
-                  className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold",
+                    supplier.supplierBalance > 0
+                      ? "border-red-100 bg-red-50 text-red-700"
+                      : "border-emerald-100 bg-emerald-50 text-emerald-700"
+                  )}
+                  title={`${supplier.supplierName}: jami ${formatCny(supplier.supplierTotal)}, to'landi ${formatCny(supplier.supplierPaid)}, qarz ${formatCny(supplier.supplierBalance)}`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-semibold text-gray-900">{supplier.supplierName}</span>
-                    <span className={cn("text-xs font-semibold", supplier.supplierBalance > 0 ? "text-red-600" : "text-green-600")}>
-                      {supplier.supplierBalance > 0 ? "qarz" : "to'langan"}
-                    </span>
-                  </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <SupplierFinanceMini label="Jami" value={supplier.supplierTotal} />
-                    <SupplierFinanceMini label="To'landi" value={supplier.supplierPaid} className="text-green-700" />
-                    <SupplierFinanceMini
-                      label="Qarz"
-                      value={supplier.supplierBalance}
-                      className={supplier.supplierBalance > 0 ? "text-red-700" : "text-green-700"}
-                    />
-                  </div>
-                </div>
+                  <span className="max-w-28 truncate text-gray-900">{supplier.supplierName}</span>
+                  <span>{supplier.supplierBalance > 0 ? `qarz ${formatCny(supplier.supplierBalance)}` : "to'langan"}</span>
+                </span>
               ))}
-            </div>
           </div>
         )}
-      </div>
 
-      <div className="overflow-x-auto">
+      <div className="mt-5 overflow-x-auto border-t border-gray-100 pt-0">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
@@ -87,6 +93,7 @@ export function OrderDetailItemsTable({ order, isAdmin, financeSummary }: OrderD
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 whitespace-nowrap">Sotuv (¥)</th>
               {isAdmin && <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Foyda</th>}
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Miqdor</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 whitespace-nowrap">Chiqish</th>
               {isAdmin && <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 whitespace-nowrap">Ta'minotchi</th>}
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Izoh</th>
             </tr>
@@ -95,6 +102,8 @@ export function OrderDetailItemsTable({ order, isAdmin, financeSummary }: OrderD
             {order.items.map((item) => {
               const count = duplicateCounts.get(item.partCode) ?? 0;
               const itemProfit = (toNumber(item.sellingPriceCny) - toNumber(item.purchasePriceCny)) * item.quantity;
+              const shippedQuantity = Math.min(Math.max(0, item.shippedQuantity ?? 0), item.quantity);
+              const fulfillmentStatus = getFulfillmentStatus(item.quantity, shippedQuantity);
               return (
                 <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="px-4 py-2.5 text-left align-middle whitespace-nowrap">
@@ -116,6 +125,14 @@ export function OrderDetailItemsTable({ order, isAdmin, financeSummary }: OrderD
                   <td className="px-4 py-2.5 text-center align-middle text-sm text-gray-700">{formatCny(item.sellingPriceCny?.toString())}</td>
                   {isAdmin && <td className={cn("px-4 py-2.5 text-center align-middle text-sm font-semibold", profitClass(itemProfit))}>{formatCny(itemProfit)}</td>}
                   <td className="px-4 py-2.5 text-center align-middle text-sm font-semibold text-gray-800">{item.quantity}</td>
+                  <td className="px-4 py-2.5 text-center align-middle">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-100 bg-white px-2.5 py-1 shadow-xs">
+                      <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap", ORDER_ITEM_FULFILLMENT_STYLES[fulfillmentStatus])}>
+                        {ORDER_ITEM_FULFILLMENT_LABELS[fulfillmentStatus]}
+                      </span>
+                      <span className="text-xs font-semibold tabular-nums text-gray-900">{shippedQuantity}/{item.quantity}</span>
+                    </div>
+                  </td>
                   {isAdmin && <td className="px-4 py-2.5 text-center align-middle text-sm text-gray-600">{item.supplierName ?? "—"}</td>}
                   <td className="px-4 py-2.5 text-center align-middle text-sm text-gray-400">{item.note ?? ""}</td>
                 </tr>
@@ -124,50 +141,6 @@ export function OrderDetailItemsTable({ order, isAdmin, financeSummary }: OrderD
           </tbody>
         </table>
       </div>
-    </div>
-  );
-}
-
-function SupplierFinanceMini({ label, value, className }: { label: string; value: number; className?: string }) {
-  return (
-    <div>
-      <div className="text-[11px] font-medium text-gray-400">{label}</div>
-      <div className={cn("mt-0.5 font-semibold tabular-nums text-gray-900", className)}>{formatCny(value)}</div>
-    </div>
-  );
-}
-
-type SummaryTone = "neutral" | "cost" | "revenue" | "profit" | "margin";
-
-const summaryToneClasses: Record<SummaryTone, { card: string; value: string }> = {
-  neutral: {
-    card: "border-gray-100 bg-gray-50",
-    value: "text-gray-900",
-  },
-  cost: {
-    card: "border-red-100 bg-red-50/70",
-    value: "text-red-700",
-  },
-  revenue: {
-    card: "border-blue-100 bg-blue-50/70",
-    value: "text-blue-700",
-  },
-  profit: {
-    card: "border-emerald-100 bg-emerald-50/70",
-    value: "text-emerald-700",
-  },
-  margin: {
-    card: "border-violet-100 bg-violet-50/70",
-    value: "text-violet-700",
-  },
-};
-
-function SummaryValue({ label, value, tone }: { label: string; value: string | number; tone: SummaryTone }) {
-  const classes = summaryToneClasses[tone];
-  return (
-    <div className={cn("min-w-32 rounded-lg border px-3 py-2.5", classes.card)}>
-      <div className="text-xs font-medium text-gray-500">{label}</div>
-      <div className={cn("mt-1 text-base font-semibold", classes.value)}>{value}</div>
-    </div>
+    </OrderSection>
   );
 }

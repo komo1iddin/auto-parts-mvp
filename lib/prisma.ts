@@ -56,6 +56,8 @@ const columnByField: Record<string, string> = {
   partName: "part_name",
   categoryName: "category_name",
   supplierName: "supplier_name",
+  shippedQuantity: "shipped_quantity",
+  fulfillmentStatus: "fulfillment_status",
   oldOrderNumber: "old_order_number",
   newOrderNumber: "new_order_number",
   changedBy: "changed_by",
@@ -395,11 +397,14 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
 
   if (model === "order") {
     const userIds = unique(rows.flatMap((row) => [row.createdBy, row.updatedBy]));
-    const [users, customers, items, clientPayments, supplierPayments, profitWithdrawals] = await Promise.all([
+    const [users, customers, items, revisions, clientPayments, supplierPayments, profitWithdrawals] = await Promise.all([
       include.creator || include.updater ? selectByIds("user", userIds) : Promise.resolve(new Map()),
       include.customer ? selectByIds("customer", rows.map((row) => row.customerId)) : Promise.resolve(new Map()),
       include._count?.select?.items || include.items
         ? selectWhereIn("orderItem", "orderId", rows.map((row) => row.id))
+        : Promise.resolve([]),
+      include.revisions
+        ? selectWhereIn("orderRevision", "orderId", rows.map((row) => row.id))
         : Promise.resolve([]),
       include.clientPayments
         ? selectWhereIn("clientPayment", "orderId", rows.map((row) => row.id))
@@ -417,18 +422,35 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
       if (!rowIds.has(item.orderId)) continue;
       itemsByOrder.set(item.orderId, [...(itemsByOrder.get(item.orderId) ?? []), item]);
     }
+    const revisionsWithIncludes = (include.revisions
+      ? await applyBatchedIncludes("orderRevision", revisions, include.revisions.include)
+      : []) as AnyRecord[];
+    const revisionsByOrder = new Map<string, AnyRecord[]>();
+    for (const revision of revisionsWithIncludes) {
+      if (!rowIds.has(revision.orderId)) continue;
+      revisionsByOrder.set(revision.orderId, [...(revisionsByOrder.get(revision.orderId) ?? []), revision]);
+    }
+    const clientPaymentsWithIncludes = (include.clientPayments
+      ? await applyBatchedIncludes("clientPayment", clientPayments, include.clientPayments.include)
+      : []) as AnyRecord[];
     const clientPaymentsByOrder = new Map<string, AnyRecord[]>();
-    for (const payment of clientPayments) {
+    for (const payment of clientPaymentsWithIncludes) {
       if (!rowIds.has(payment.orderId)) continue;
       clientPaymentsByOrder.set(payment.orderId, [...(clientPaymentsByOrder.get(payment.orderId) ?? []), payment]);
     }
+    const supplierPaymentsWithIncludes = (include.supplierPayments
+      ? await applyBatchedIncludes("supplierPayment", supplierPayments, include.supplierPayments.include)
+      : []) as AnyRecord[];
     const supplierPaymentsByOrder = new Map<string, AnyRecord[]>();
-    for (const payment of supplierPayments) {
+    for (const payment of supplierPaymentsWithIncludes) {
       if (!rowIds.has(payment.orderId)) continue;
       supplierPaymentsByOrder.set(payment.orderId, [...(supplierPaymentsByOrder.get(payment.orderId) ?? []), payment]);
     }
+    const profitWithdrawalsWithIncludes = (include.profitWithdrawals
+      ? await applyBatchedIncludes("profitWithdrawal", profitWithdrawals, include.profitWithdrawals.include)
+      : []) as AnyRecord[];
     const profitWithdrawalsByOrder = new Map<string, AnyRecord[]>();
-    for (const payment of profitWithdrawals) {
+    for (const payment of profitWithdrawalsWithIncludes) {
       if (!rowIds.has(payment.orderId)) continue;
       profitWithdrawalsByOrder.set(payment.orderId, [...(profitWithdrawalsByOrder.get(payment.orderId) ?? []), payment]);
     }
@@ -453,6 +475,9 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
             }
           : {}),
         ...(include.items ? { items: orderItems.sort(compareBy(include.items.orderBy)) } : {}),
+        ...(include.revisions
+          ? { revisions: (revisionsByOrder.get(row.id) ?? []).sort(compareBy(include.revisions.orderBy)) }
+          : {}),
         ...(include.clientPayments
           ? { clientPayments: (clientPaymentsByOrder.get(row.id) ?? []).sort(compareBy(include.clientPayments.orderBy)) }
           : {}),
@@ -465,6 +490,25 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
         ...(include._count?.select?.items ? { _count: { items: orderItems.length } } : {}),
       };
     });
+  }
+
+  if (model === "orderRevision") {
+    const users = include.changer
+      ? await selectByIds("user", rows.map((row) => row.changedBy))
+      : new Map<string, AnyRecord>();
+
+    return rows.map((row) => ({
+      ...row,
+      ...(include.changer
+        ? {
+            changer: row.changedBy
+              ? include.changer.select
+                ? pick(users.get(row.changedBy), include.changer.select)
+                : users.get(row.changedBy) ?? null
+              : null,
+          }
+        : {}),
+    }));
   }
 
   if (model === "clientPayment") {
@@ -509,6 +553,25 @@ async function applyBatchedIncludes(model: keyof typeof tableByModel, rows: AnyR
               ? include.supplier.select
                 ? pick(suppliers.get(row.supplierId), include.supplier.select)
                 : suppliers.get(row.supplierId) ?? null
+              : null,
+          }
+        : {}),
+    }));
+  }
+
+  if (model === "profitWithdrawal") {
+    const users = include.creator
+      ? await selectByIds("user", rows.map((row) => row.createdBy))
+      : new Map<string, AnyRecord>();
+
+    return rows.map((row) => ({
+      ...row,
+      ...(include.creator
+        ? {
+            creator: row.createdBy
+              ? include.creator.select
+                ? pick(users.get(row.createdBy), include.creator.select)
+                : users.get(row.createdBy) ?? null
               : null,
           }
         : {}),
@@ -710,7 +773,9 @@ function modelApi(model: keyof typeof tableByModel) {
         .maybeSingle();
       if (error) throw new Error(error.message);
       const row = fromDbRow(data);
-      return applyIncludes(model, row, args.include);
+      if (!row || !args.include) return row;
+      const [rowWithIncludes] = await applyBatchedIncludes(model, [row], args.include);
+      return (rowWithIncludes as AnyRecord | undefined) ?? null;
     },
 
     async create(args: AnyRecord) {

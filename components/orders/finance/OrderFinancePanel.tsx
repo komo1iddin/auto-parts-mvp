@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ArrowRight, Landmark } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { OrderFinancePage } from "@/components/orders/OrderFinancePage";
+import { OrderMetric, OrderMetricStrip, OrderSection } from "@/components/orders/detail/OrderSection";
+import { OrderSectionActionButton } from "@/components/orders/detail/OrderSectionActionButton";
 import type { PaymentRecord, SupplierOption } from "@/components/orders/types/orderFinanceTypes";
 import { type OrderFinanceSummary, type PaymentStatus } from "@/lib/order-finance";
 import { cn, formatCny } from "@/lib/utils";
@@ -48,63 +50,53 @@ export function OrderFinancePanel({
   suppliers,
 }: OrderFinancePanelProps) {
   const [open, setOpen] = useState(false);
-  const stats: { label: string; value: string; tone: FinanceTone }[] = [
-    { label: "Jami", value: formatCny(summary.clientTotal), tone: "neutral" },
-    { label: "To'landi", value: formatCny(summary.clientPaid), tone: "neutral" },
+  const stats: { label: string; value: string; className?: string }[] = [
+    { label: "Jami", value: formatCny(summary.clientTotal) },
+    { label: "To'landi", value: formatCny(summary.clientPaid), className: summary.clientPaid > 0 ? "text-emerald-700" : undefined },
     {
       label: "Qoldiq",
       value: formatCny(summary.clientBalance),
-      tone: summary.clientBalance > 0 ? "danger" : "balance",
+      className: summary.clientBalance > 0 ? "text-red-700" : "text-emerald-700",
     },
     ...(isAdmin
       ? [
           {
             label: "Foyda",
             value: formatCny(summary.expectedGrossProfit),
-            tone: (summary.expectedGrossProfit >= 0 ? "profit" : "danger") as FinanceTone,
+            className: summary.expectedGrossProfit >= 0 ? "text-emerald-700" : "text-red-700",
           },
         ]
       : []),
   ];
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600">
-              <Landmark className="size-4" />
-            </span>
-            <h2 className="text-base font-semibold text-gray-950">Moliya</h2>
-            <span
-              className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-semibold",
-                statusBadgeClass(summary.clientPaymentStatus)
-              )}
-            >
-              {CLIENT_STATUS_LABELS[summary.clientPaymentStatus]}
-            </span>
-          </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat) => (
-              <div key={stat.label} className={cn("min-w-32 rounded-lg border px-3 py-2.5", financeToneClasses[stat.tone].card)}>
-                <div className="text-xs font-medium text-gray-500">{stat.label}</div>
-                <div className={cn("mt-1 text-base font-semibold", financeToneClasses[stat.tone].value)}>
-                  {stat.value}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <button
-          type="button"
+    <OrderSection
+      icon={<Landmark className="size-4" />}
+      title="Moliya"
+      badge={(
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-1 text-xs font-semibold",
+            statusBadgeClass(summary.clientPaymentStatus)
+          )}
+        >
+          {CLIENT_STATUS_LABELS[summary.clientPaymentStatus]}
+        </span>
+      )}
+      action={(
+        <OrderSectionActionButton
           onClick={() => setOpen(true)}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-950"
+          icon={<ArrowRight />}
         >
           Moliya paneli
-          <ArrowRight className="size-4" />
-        </button>
-      </div>
+        </OrderSectionActionButton>
+      )}
+    >
+      <OrderMetricStrip>
+        {stats.map((stat) => (
+          <OrderMetric key={stat.label} label={stat.label} value={stat.value} valueClassName={stat.className} />
+        ))}
+      </OrderMetricStrip>
 
       <Modal
         open={open}
@@ -126,27 +118,6 @@ export function OrderFinancePanel({
           suppliers={suppliers}
         />
       </Modal>
-    </section>
+    </OrderSection>
   );
 }
-
-type FinanceTone = "neutral" | "balance" | "profit" | "danger";
-
-const financeToneClasses: Record<FinanceTone, { card: string; value: string }> = {
-  neutral: {
-    card: "border-gray-100 bg-gray-50",
-    value: "text-gray-950",
-  },
-  balance: {
-    card: "border-sky-100 bg-sky-50/60",
-    value: "text-sky-700",
-  },
-  profit: {
-    card: "border-emerald-100 bg-emerald-50/60",
-    value: "text-emerald-700",
-  },
-  danger: {
-    card: "border-red-100 bg-red-50/60",
-    value: "text-red-700",
-  },
-};

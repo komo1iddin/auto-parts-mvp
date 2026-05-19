@@ -15,22 +15,22 @@ model User {
   canCreateClientPayments Boolean  @default(false) @map("can_create_client_payments")
   createdAt               DateTime @default(now()) @map("created_at")
 
-  createdOrders Order[]         @relation("CreatedOrders")
-  updatedOrders Order[]         @relation("UpdatedOrders")
-  revisions     OrderRevision[]
-  exports       OrderExport[]
-  clientPayments ClientPayment[]
-  supplierPayments SupplierPayment[]
+  createdOrders     Order[]            @relation("CreatedOrders")
+  updatedOrders     Order[]            @relation("UpdatedOrders")
+  revisions         OrderRevision[]
+  exports           OrderExport[]
+  clientPayments    ClientPayment[]
+  supplierPayments  SupplierPayment[]
   profitWithdrawals ProfitWithdrawal[]
 
   @@map("users")
 }
 
 model Category {
-  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String
-  parentId  String?    @map("parent_id") @db.Uuid
-  createdAt DateTime   @default(now()) @map("created_at")
+  parentId  String?  @map("parent_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
 
   parent   Category?  @relation("SubCategories", fields: [parentId], references: [id])
   children Category[] @relation("SubCategories")
@@ -40,7 +40,7 @@ model Category {
 }
 
 model Supplier {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String
   phone     String?
   wechat    String?
@@ -48,8 +48,8 @@ model Supplier {
   createdAt DateTime @default(now()) @map("created_at")
 
   partSupplierPrices PartSupplierPrice[]
-  exports  OrderExport[]
-  payments SupplierPayment[]
+  exports            OrderExport[]
+  payments           SupplierPayment[]
 
   @@map("suppliers")
 }
@@ -87,10 +87,10 @@ model Part {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
 
-  category   Category?   @relation(fields: [categoryId], references: [id])
-  variants   PartVariant[]
+  category    Category?       @relation(fields: [categoryId], references: [id])
+  variants    PartVariant[]
   codeAliases PartCodeAlias[]
-  orderItems OrderItem[]
+  orderItems  OrderItem[]
 
   @@map("parts")
 }
@@ -119,9 +119,9 @@ model PartVariant {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
 
-  part       Part        @relation(fields: [partId], references: [id], onDelete: Cascade)
+  part           Part                @relation(fields: [partId], references: [id], onDelete: Cascade)
   supplierPrices PartSupplierPrice[]
-  orderItems OrderItem[]
+  orderItems     OrderItem[]
 
   @@unique([partId, brand, type])
   @@index([partId])
@@ -160,44 +160,51 @@ model Order {
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
 
-  creator   User?           @relation("CreatedOrders", fields: [createdBy], references: [id])
-  updater   User?           @relation("UpdatedOrders", fields: [updatedBy], references: [id])
-  customer  Customer?       @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  items     OrderItem[]
-  revisions OrderRevision[]
-  exports   OrderExport[]
-  clientPayments ClientPayment[]
-  supplierPayments SupplierPayment[]
+  creator           User?              @relation("CreatedOrders", fields: [createdBy], references: [id])
+  updater           User?              @relation("UpdatedOrders", fields: [updatedBy], references: [id])
+  customer          Customer?          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items             OrderItem[]
+  revisions         OrderRevision[]
+  exports           OrderExport[]
+  clientPayments    ClientPayment[]
+  supplierPayments  SupplierPayment[]
   profitWithdrawals ProfitWithdrawal[]
 
   @@index([customerId])
+  @@index([createdBy, status, createdAt])
+  @@index([createdBy, status, updatedAt])
+  @@index([status, createdAt])
+  @@index([status, updatedAt])
   @@map("orders")
 }
 
 model OrderItem {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId           String   @map("order_id") @db.Uuid
-  partId            String?  @map("part_id") @db.Uuid
-  partVariantId     String?  @map("part_variant_id") @db.Uuid
-  partSupplierPriceId String? @map("part_supplier_price_id") @db.Uuid
-  partCode          String   @map("part_code")
-  partName          String?  @map("part_name")
-  categoryName      String?  @map("category_name")
-  brand             String?
-  type              String?
-  purchasePriceCny  Decimal? @map("purchase_price_cny") @db.Decimal(12, 2)
-  wholesalePriceCny Decimal? @map("wholesale_price_cny") @db.Decimal(12, 2)
-  sellingPriceCny   Decimal? @map("selling_price_cny") @db.Decimal(12, 2)
-  supplierId        String?  @map("supplier_id") @db.Uuid
-  supplierName      String?  @map("supplier_name")
-  quantity          Int      @default(1)
-  note              String?
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId             String   @map("order_id") @db.Uuid
+  partId              String?  @map("part_id") @db.Uuid
+  partVariantId       String?  @map("part_variant_id") @db.Uuid
+  partSupplierPriceId String?  @map("part_supplier_price_id") @db.Uuid
+  partCode            String   @map("part_code")
+  partName            String?  @map("part_name")
+  categoryName        String?  @map("category_name")
+  brand               String?
+  type                String?
+  purchasePriceCny    Decimal? @map("purchase_price_cny") @db.Decimal(12, 2)
+  wholesalePriceCny   Decimal? @map("wholesale_price_cny") @db.Decimal(12, 2)
+  sellingPriceCny     Decimal? @map("selling_price_cny") @db.Decimal(12, 2)
+  supplierId          String?  @map("supplier_id") @db.Uuid
+  supplierName        String?  @map("supplier_name")
+  quantity            Int      @default(1)
+  shippedQuantity     Int      @default(0) @map("shipped_quantity")
+  fulfillmentStatus   String   @default("waiting") @map("fulfillment_status")
+  note                String?
 
-  order Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  part  Part?  @relation(fields: [partId], references: [id])
-  partVariant PartVariant? @relation(fields: [partVariantId], references: [id])
+  order             Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  part              Part?              @relation(fields: [partId], references: [id])
+  partVariant       PartVariant?       @relation(fields: [partVariantId], references: [id])
   partSupplierPrice PartSupplierPrice? @relation(fields: [partSupplierPriceId], references: [id])
 
+  @@index([orderId])
   @@index([partVariantId])
   @@index([partSupplierPriceId])
   @@map("order_items")
@@ -216,6 +223,7 @@ model OrderRevision {
   order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   changer User? @relation(fields: [changedBy], references: [id])
 
+  @@index([orderId])
   @@map("order_revisions")
 }
 
@@ -233,6 +241,7 @@ model OrderExport {
   supplier Supplier? @relation(fields: [supplierId], references: [id])
   exporter User?     @relation(fields: [exportedBy], references: [id])
 
+  @@index([orderId])
   @@map("order_exports")
 }
 

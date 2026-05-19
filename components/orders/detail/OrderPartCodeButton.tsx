@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { PartDetails, type PartDetailsData } from "@/components/parts/detail/PartDetails";
 import type { DetailItem } from "@/components/orders/types/orderDetailTypes";
 import { Modal } from "@/components/ui/Modal";
+import { OrderPartCodeText } from "@/components/orders/detail/OrderPartCodeText";
 
 interface OrderPartCodeButtonProps {
   item: DetailItem;
@@ -56,7 +57,7 @@ export function OrderPartCodeButton({ item, isAdmin }: OrderPartCodeButtonProps)
         onClick={openPart}
         className="rounded-sm text-left text-[15px] font-semibold text-blue-700 underline-offset-2 transition-colors hover:text-blue-900 hover:underline focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
       >
-        <span className="font-sans tabular-nums">{code}</span>
+        <OrderPartCodeText code={code} />
       </button>
 
       <Modal

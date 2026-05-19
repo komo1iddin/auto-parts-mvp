@@ -15,6 +15,7 @@ import {
 import { useOrderItems } from "@/components/orders/builder/hooks/useOrderItems";
 import { usePartSearch } from "@/components/orders/builder/hooks/usePartSearch";
 import { useUnsavedOrderNavigation } from "@/components/orders/builder/hooks/useUnsavedOrderNavigation";
+import { markLocalMutation } from "@/lib/client/local-mutation";
 
 interface UseOrderBuilderArgs {
   existingOrder?: {
@@ -79,6 +80,7 @@ export function useOrderBuilder({ existingOrder, redirectTo, ordersPath }: UseOr
     setSaving(true);
     setError("");
     const finalNote = existingOrder ? (changeNote.trim() || changelogPreview) : changeNote;
+    markLocalMutation();
     const response = await fetch(existingOrder ? `/api/orders/${existingOrder.id}` : "/api/orders", {
       method: existingOrder ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
@@ -92,6 +94,7 @@ export function useOrderBuilder({ existingOrder, redirectTo, ordersPath }: UseOr
     }
 
     navigation.markSaved();
+    markLocalMutation();
     startSaveNavigation(() => {
       if (destination?.type === "href") router.push(destination.href);
       else if (destination?.type === "back") window.history.go(destination.delta ?? -1);

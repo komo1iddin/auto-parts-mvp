@@ -4,6 +4,7 @@ import { requireAdminOrManager, unauthorized } from "@/lib/auth";
 import { getOrdersList, revalidateAppData } from "@/lib/data";
 import { generateOrderNumber, buildOrderNumber, isEditableOrderStatus } from "@/lib/utils";
 import { attachCatalogToOrderItems } from "@/lib/order-catalog";
+import { clampShippedQuantity, getFulfillmentStatus } from "@/lib/order-fulfillment";
 
 export async function GET(req: NextRequest) {
   let user;
@@ -83,6 +84,31 @@ export async function POST(req: NextRequest) {
   const orderNumber = buildOrderNumber(base, seq, 1);
   const catalogItems = await attachCatalogToOrderItems(items);
 
+  const orderItems = catalogItems.map((item) => {
+    const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    const shippedQuantity = clampShippedQuantity(item.shippedQuantity, quantity);
+
+    return {
+      partId: item.partId || null,
+      partVariantId: item.partVariantId || null,
+      partSupplierPriceId: item.partSupplierPriceId || null,
+      partCode: item.partCode,
+      partName: item.partName || null,
+      categoryName: item.categoryName || null,
+      brand: item.brand || null,
+      type: item.type || null,
+      purchasePriceCny: item.purchasePriceCny != null ? Number(item.purchasePriceCny) : null,
+      wholesalePriceCny: item.wholesalePriceCny != null ? Number(item.wholesalePriceCny) : null,
+      sellingPriceCny: item.sellingPriceCny != null ? Number(item.sellingPriceCny) : null,
+      supplierId: item.supplierId || null,
+      supplierName: item.supplierName || null,
+      quantity,
+      shippedQuantity,
+      fulfillmentStatus: getFulfillmentStatus(quantity, shippedQuantity),
+      note: item.note || null,
+    };
+  });
+
   const order = await prisma.order.create({
     data: {
       baseOrderNumber: `${base}-${String(seq).padStart(3, "0")}`,
@@ -93,23 +119,7 @@ export async function POST(req: NextRequest) {
       createdBy: user.id,
       updatedBy: user.id,
       items: {
-        create: catalogItems.map((item) => ({
-          partId: item.partId || null,
-          partVariantId: item.partVariantId || null,
-          partSupplierPriceId: item.partSupplierPriceId || null,
-          partCode: item.partCode,
-          partName: item.partName || null,
-          categoryName: item.categoryName || null,
-          brand: item.brand || null,
-          type: item.type || null,
-          purchasePriceCny: item.purchasePriceCny != null ? Number(item.purchasePriceCny) : null,
-          wholesalePriceCny: item.wholesalePriceCny != null ? Number(item.wholesalePriceCny) : null,
-          sellingPriceCny: item.sellingPriceCny != null ? Number(item.sellingPriceCny) : null,
-          supplierId: item.supplierId || null,
-          supplierName: item.supplierName || null,
-          quantity: Number(item.quantity) || 1,
-          note: item.note || null,
-        })),
+        create: orderItems,
       },
     },
     include: { items: true, creator: { select: { name: true } }, customer: { select: { name: true } } },

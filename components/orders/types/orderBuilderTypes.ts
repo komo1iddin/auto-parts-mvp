@@ -52,6 +52,8 @@ export interface OrderItem {
   supplierId: string;
   supplierName: string;
   quantity: number;
+  shippedQuantity: number;
+  fulfillmentStatus?: string | null;
   note: string;
 }
 

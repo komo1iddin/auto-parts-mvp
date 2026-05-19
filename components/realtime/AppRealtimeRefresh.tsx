@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { wasRecentLocalMutation } from "@/lib/client/local-mutation";
 
 const REFRESH_DEBOUNCE_MS = 350;
 
@@ -17,6 +18,8 @@ export function AppRealtimeRefresh() {
     const supabase = createClient();
 
     function refreshCurrentRoute() {
+      if (wasRecentLocalMutation()) return;
+
       if (document.visibilityState !== "visible") {
         pendingWhileHiddenRef.current = true;
         return;

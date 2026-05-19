@@ -1,8 +1,8 @@
-import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { OrderDetailView } from "@/components/orders/OrderDetailView";
 import { OrderFinancePanel } from "@/components/orders/finance/OrderFinancePanel";
 import { calculateOrderFinance } from "@/lib/order-finance";
+import { getOrderDetailFast } from "@/lib/order-detail-query";
 
 export default async function AdminOrderDetailPage({
   params,
@@ -11,40 +11,7 @@ export default async function AdminOrderDetailPage({
 }) {
   const { id } = await params;
 
-  const [order, exports] = await Promise.all([
-    prisma.order.findUnique({
-      where: { id },
-      include: {
-        items: { orderBy: { partCode: "asc" } },
-        creator: { select: { name: true } },
-        updater: { select: { name: true } },
-        customer: { select: { name: true } },
-        revisions: {
-          orderBy: { version: "desc" },
-          include: { changer: { select: { name: true } } },
-        },
-        clientPayments: {
-          orderBy: { paymentDate: "desc" },
-          include: { creator: { select: { name: true } } },
-        },
-        supplierPayments: {
-          orderBy: { paymentDate: "desc" },
-          include: {
-            creator: { select: { name: true } },
-            supplier: { select: { name: true } },
-          },
-        },
-        profitWithdrawals: {
-          orderBy: { paymentDate: "desc" },
-          include: { creator: { select: { name: true } } },
-        },
-      },
-    }),
-    prisma.orderExport.findMany({
-      where: { orderId: id },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+  const order = await getOrderDetailFast(id);
 
   if (!order) notFound();
 
@@ -59,7 +26,7 @@ export default async function AdminOrderDetailPage({
   return (
     <OrderDetailView
       order={order}
-      exports={exports}
+      exports={order.exports ?? []}
       isAdmin={true}
       basePath="/admin/orders"
       financeSummary={finance}
@@ -74,24 +41,28 @@ export default async function AdminOrderDetailPage({
           clientPayments={clientPayments.map((payment) => ({
             ...payment,
             amountCny: payment.amountCny.toString(),
-            paymentDate: payment.paymentDate.toISOString(),
-            createdAt: payment.createdAt.toISOString(),
+            paymentDate: toIsoString(payment.paymentDate),
+            createdAt: toIsoString(payment.createdAt),
           }))}
           supplierPayments={supplierPayments.map((payment) => ({
             ...payment,
             amountCny: payment.amountCny.toString(),
-            paymentDate: payment.paymentDate.toISOString(),
-            createdAt: payment.createdAt.toISOString(),
+            paymentDate: toIsoString(payment.paymentDate),
+            createdAt: toIsoString(payment.createdAt),
           }))}
           profitWithdrawals={profitWithdrawals.map((payment) => ({
             ...payment,
             amountCny: payment.amountCny.toString(),
-            paymentDate: payment.paymentDate.toISOString(),
-            createdAt: payment.createdAt.toISOString(),
+            paymentDate: toIsoString(payment.paymentDate),
+            createdAt: toIsoString(payment.createdAt),
           }))}
           suppliers={orderSuppliers}
         />
       }
     />
   );
+}
+
+function toIsoString(value: Date | string) {
+  return value instanceof Date ? value.toISOString() : value;
 }

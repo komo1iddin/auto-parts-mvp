@@ -298,6 +298,7 @@ export const getOrdersList = unstable_cache(
           items: {
             select: {
               quantity: true,
+              shippedQuantity: true,
               purchasePriceCny: true,
               sellingPriceCny: true,
               supplierName: true,
@@ -316,6 +317,9 @@ export const getOrdersList = unstable_cache(
     const orders = rawOrders.map((o) => ({
       ...o,
       totalQty: o.items.reduce((s: number, i: { quantity: number }) => s + i.quantity, 0),
+      shippedQty: o.items.reduce((s: number, i: { quantity: number; shippedQuantity?: number | null }) => (
+        s + Math.min(Math.max(0, Number(i.shippedQuantity ?? 0)), i.quantity)
+      ), 0),
       totalPurchase: isAdmin
         ? o.items.reduce((s: number, i: { purchasePriceCny: unknown; quantity: number }) => s + Number(i.purchasePriceCny ?? 0) * i.quantity, 0)
         : undefined,

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { OrderItem, PartSearchResult } from "@/components/orders/types/orderBuilderTypes";
-import { buildOrderItem } from "@/components/orders/builder/utils/orderBuilderUtils";
+import { buildOrderItem, withFulfillment } from "@/components/orders/builder/utils/orderBuilderUtils";
 
 function itemKey(item: OrderItem) {
   return item.id ?? item.partVariantId ?? item.partId ?? item.localId ?? item.partCode;
@@ -39,7 +39,7 @@ export function useOrderItems(initialItems: OrderItem[]) {
     if (exists) {
       setItems((current) => current.map((item) => (
         item.partVariantId === part.id ? { ...item, quantity: item.quantity + 1 } : item
-      )));
+      )).map(withFulfillment));
     } else {
       setItems((current) => [...current, buildOrderItem(part)]);
     }
@@ -66,20 +66,20 @@ export function useOrderItems(initialItems: OrderItem[]) {
         }
       }
 
-      return next;
+      return next.map(withFulfillment);
     });
   }
 
   function updateQty(partId: string, qty: number) {
     const safe = Math.max(0, Math.floor(qty));
     setItems((current) => current.map((item) => (
-      itemKey(item) === partId ? { ...item, quantity: safe } : item
+      itemKey(item) === partId ? withFulfillment({ ...item, quantity: safe }) : item
     )));
   }
 
   function updateField<K extends keyof OrderItem>(partId: string, field: K, value: OrderItem[K]) {
     setItems((current) => current.map((item) => (
-      itemKey(item) === partId ? { ...item, [field]: value } : item
+      itemKey(item) === partId ? withFulfillment({ ...item, [field]: value }) : item
     )));
   }
 

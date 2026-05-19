@@ -19,6 +19,8 @@ export type IncomingOrderItem = {
   supplierId?: string | null;
   supplierName?: string | null;
   quantity: number;
+  shippedQuantity?: number | null;
+  fulfillmentStatus?: string | null;
   note?: string | null;
 };
 

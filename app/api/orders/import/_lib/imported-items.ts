@@ -36,6 +36,8 @@ export function buildImportedItems(
       supplierId: offer?.supplierId ?? "",
       supplierName: offer?.supplier?.name || "",
       quantity: row.quantity,
+      shippedQuantity: 0,
+      fulfillmentStatus: "waiting",
       note: row.note,
     };
   });

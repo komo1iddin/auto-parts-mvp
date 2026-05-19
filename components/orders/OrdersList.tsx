@@ -9,6 +9,7 @@ import type {
   OrderListItem,
   OrdersListProps,
 } from "@/components/orders/types/ordersListTypes";
+import { markLocalMutation } from "@/lib/client/local-mutation";
 
 export function OrdersList({
   orders,
@@ -47,7 +48,9 @@ export function OrdersList({
 
   async function cancelOrder(order: OrderListItem) {
     if (!confirm(`"${order.currentOrderNumber}" buyurtmasini bekor qilishni tasdiqlaysizmi?`)) return;
+    markLocalMutation();
     await fetch(`/api/orders/${order.id}`, { method: "DELETE" });
+    markLocalMutation();
     startTransition(() => router.refresh());
   }
 

@@ -17,6 +17,8 @@ type OrderCatalogItem = {
   supplierId?: string | null;
   supplierName?: string | null;
   quantity?: number;
+  shippedQuantity?: number | null;
+  fulfillmentStatus?: string | null;
   note?: string | null;
 };
 
@@ -165,4 +167,3 @@ export async function attachCatalogToOrderItems<T extends OrderCatalogItem>(item
   if (changedCatalog) revalidateAppData("parts");
   return nextItems;
 }
-

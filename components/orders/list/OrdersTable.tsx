@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { X, PackageSearch } from "lucide-react";
 import type { OrderListItem } from "@/components/orders/types/ordersListTypes";
 import { ORDER_STATUSES, cn, formatCny } from "@/lib/utils";
+import { getFulfillmentStatus } from "@/lib/order-fulfillment";
 
 interface OrdersTableProps {
   orders: OrderListItem[];
@@ -26,15 +27,16 @@ export function OrdersTable({
     <div className={`overflow-x-hidden transition-opacity ${isPending ? "opacity-60 pointer-events-none" : ""}`}>
       <table className="w-full table-fixed text-sm">
         <colgroup>
-          <col className={isAdmin ? "w-[17%]" : "w-[19%]"} />
-          <col className={isAdmin ? "w-[14%]" : "w-[16%]"} />
-          <col className={isAdmin ? "w-[15%]" : "w-[17%]"} />
-          <col className="w-[5%]" />
-          {isAdmin && <col className="w-[11%]" />}
-          <col className={isAdmin ? "w-[11%]" : "w-[13%]"} />
+          <col className={isAdmin ? "w-[14%]" : "w-[18%]"} />
           <col className={isAdmin ? "w-[12%]" : "w-[15%]"} />
+          <col className={isAdmin ? "w-[12%]" : "w-[15%]"} />
+          <col className="w-[5%]" />
+          <col className={isAdmin ? "w-[8%]" : "w-[10%]"} />
+          {isAdmin && <col className="w-[10%]" />}
+          <col className={isAdmin ? "w-[10%]" : "w-[13%]"} />
+          <col className={isAdmin ? "w-[12%]" : "w-[14%]"} />
           {canShowCreator && <col className="w-[7%]" />}
-          <col className={isAdmin ? "w-[7%]" : "w-[9%]"} />
+          <col className={isAdmin ? "w-[9%]" : "w-[9%]"} />
           <col className="w-[1%]" />
         </colgroup>
         <thead>
@@ -43,6 +45,7 @@ export function OrdersTable({
             <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Mijoz</th>
             <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Holat</th>
             <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Ver.</th>
+            <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Chiqdi</th>
             {isAdmin && (
               <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">Xarid</th>
             )}
@@ -91,6 +94,9 @@ function OrdersTableRow({
   const href = `${basePath}/${order.id}`;
   const date = new Date(order.createdAt);
   const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const totalQty = order.totalQty ?? 0;
+  const shippedQty = Math.min(order.shippedQty ?? 0, totalQty);
+  const fulfillmentStatus = getFulfillmentStatus(totalQty, shippedQty);
 
   return (
     <tr
@@ -117,6 +123,11 @@ function OrdersTableRow({
       <td className="px-3 py-3.5 text-center align-middle">
         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600">
           V{order.version}
+        </span>
+      </td>
+      <td className="px-3 py-3.5 text-center align-middle">
+        <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", getFulfillmentTone(fulfillmentStatus))}>
+          {shippedQty}/{totalQty}
         </span>
       </td>
       {isAdmin && (
@@ -173,8 +184,18 @@ function getOrderStatusTone(status: string, fallback?: string) {
   return tones[status] ?? fallback ?? "bg-slate-100 text-slate-700";
 }
 
+function getFulfillmentTone(status: string) {
+  const tones: Record<string, string> = {
+    waiting: "bg-slate-100 text-slate-700",
+    partial: "bg-amber-50 text-amber-800",
+    shipped: "bg-emerald-50 text-emerald-800",
+  };
+
+  return tones[status] ?? tones.waiting;
+}
+
 function EmptyState({ isAdmin, canShowCreator }: { isAdmin: boolean; canShowCreator: boolean }) {
-  const colSpan = 8 + (isAdmin ? 1 : 0) + (canShowCreator ? 1 : 0);
+  const colSpan = 9 + (isAdmin ? 1 : 0) + (canShowCreator ? 1 : 0);
   return (
     <tr>
       <td colSpan={colSpan} className="px-4 py-16 text-center">
