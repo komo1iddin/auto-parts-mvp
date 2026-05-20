@@ -56,48 +56,47 @@ async function replaceOrderItemsAndVersion(
   const newOrderNumber = `${existing.baseOrderNumber}-V${newVersion}`;
   const catalogItems = await attachCatalogToOrderItems(body.items ?? []);
   const replacementItems = buildReplacementItems(catalogItems, existing.items);
-  const createdItemIds: string[] = [];
+  const oldItemIds = existing.items.map((i) => i.id);
 
   try {
-    for (const item of replacementItems) {
-      const created = await prisma.orderItem.create({ data: { ...item, orderId: id } });
-      createdItemIds.push(created.id);
-    }
+    const updated = await prisma.$transaction(async (tx) => {
+      // Delete old items first so the final order.update include returns only new items.
+      await tx.orderItem.deleteMany({ where: { id: { in: oldItemIds } } });
 
-    const updated = await prisma.order.update({
-      where: { id },
-      data: {
-        currentOrderNumber: newOrderNumber,
-        version: newVersion,
-        status: body.status ?? "updated",
-        customerId: body.customerId,
-        updatedBy: user.id,
-      },
-      include: { items: true, creator: { select: { name: true } }, customer: { select: { name: true } } },
-    });
+      // Bulk-insert all new items in one round-trip.
+      await tx.orderItem.createMany({
+        data: replacementItems.map((item) => ({ ...item, orderId: id })),
+      });
 
-    for (const item of existing.items) {
-      await prisma.orderItem.delete({ where: { id: item.id } });
-    }
+      const order = await tx.order.update({
+        where: { id },
+        data: {
+          currentOrderNumber: newOrderNumber,
+          version: newVersion,
+          status: body.status ?? "updated",
+          customerId: body.customerId,
+          updatedBy: user.id,
+        },
+        include: { items: true, creator: { select: { name: true } }, customer: { select: { name: true } } },
+      });
 
-    await prisma.orderRevision.create({
-      data: {
-        orderId: id,
-        version: newVersion,
-        oldOrderNumber: existing.currentOrderNumber,
-        newOrderNumber,
-        changedBy: user.id,
-        changeNote: body.changeNote || null,
-      },
+      await tx.orderRevision.create({
+        data: {
+          orderId: id,
+          version: newVersion,
+          oldOrderNumber: existing.currentOrderNumber,
+          newOrderNumber,
+          changedBy: user.id,
+          changeNote: body.changeNote || null,
+        },
+      });
+
+      return order;
     });
 
     revalidateAppData("orders");
     return Response.json({ order: updated });
   } catch (error) {
-    for (const createdId of createdItemIds) {
-      await prisma.orderItem.delete({ where: { id: createdId } }).catch(() => {});
-    }
-
     const message = error instanceof Error ? error.message : "Xatolik yuz berdi";
     return Response.json({ error: message }, { status: 500 });
   }

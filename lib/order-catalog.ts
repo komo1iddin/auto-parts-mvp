@@ -22,6 +22,8 @@ type OrderCatalogItem = {
   note?: string | null;
 };
 
+type CachedLookup = { id: string; name: string };
+
 function textKey(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
 }
@@ -34,6 +36,27 @@ function numberOrNull(value: unknown) {
 
 function sameBrand(left?: string | null, right?: string | null) {
   return textKey(left) === textKey(right);
+}
+
+/** Synchronous lookup from pre-fetched supplier list — no DB call. */
+function findSupplierFromCache(
+  item: OrderCatalogItem,
+  allSuppliers: CachedLookup[]
+): CachedLookup | null {
+  if (item.supplierId) return allSuppliers.find((s) => s.id === item.supplierId) ?? null;
+  const key = textKey(item.supplierName);
+  if (!key) return null;
+  return allSuppliers.find((s) => textKey(s.name) === key) ?? null;
+}
+
+/** Synchronous lookup from pre-fetched category list — no DB call. */
+function findCategoryIdFromCache(
+  categoryName: string | null | undefined,
+  allCategories: CachedLookup[]
+): string | null {
+  const key = textKey(categoryName);
+  if (!key) return null;
+  return allCategories.find((c) => textKey(c.name) === key)?.id ?? null;
 }
 
 async function findFamily(item: OrderCatalogItem) {
@@ -55,28 +78,17 @@ async function findFamily(item: OrderCatalogItem) {
     if (aliasPart) return aliasPart;
   }
 
+  // Targeted DB query instead of loading all parts into memory.
   const nameKey = textKey(item.partName || item.partCode);
   if (nameKey) {
-    const nameMatches = (await prisma.part.findMany()).filter((part: { name?: string | null }) => textKey(part.name) === nameKey);
+    const nameMatches = await prisma.part.findMany({
+      where: { name: { equals: nameKey, mode: "insensitive" } },
+      take: 2,
+    });
     if (nameMatches.length === 1) return nameMatches[0];
   }
 
   return null;
-}
-
-async function findCategoryId(categoryName?: string | null) {
-  const key = textKey(categoryName);
-  if (!key) return null;
-  const categories = await prisma.category.findMany();
-  return categories.find((category: { name: string }) => textKey(category.name) === key)?.id ?? null;
-}
-
-async function findSupplier(item: OrderCatalogItem) {
-  if (item.supplierId) return prisma.supplier.findUnique({ where: { id: item.supplierId } });
-  const key = textKey(item.supplierName);
-  if (!key) return null;
-  const suppliers = await prisma.supplier.findMany();
-  return suppliers.find((supplier: { name: string }) => textKey(supplier.name) === key) ?? null;
 }
 
 async function findOrCreateVariant(familyId: string, item: OrderCatalogItem) {
@@ -102,8 +114,12 @@ async function findOrCreateVariant(familyId: string, item: OrderCatalogItem) {
   });
 }
 
-async function findOrCreateSupplierPrice(partVariantId: string, item: OrderCatalogItem) {
-  const supplier = await findSupplier(item);
+/** Accepts the already-resolved supplier to avoid a second DB lookup per item. */
+async function findOrCreateSupplierPrice(
+  partVariantId: string,
+  item: OrderCatalogItem,
+  supplier: CachedLookup | null
+) {
   const purchasePriceCny = numberOrNull(item.purchasePriceCny);
   if (!supplier?.id || purchasePriceCny == null) return null;
 
@@ -125,6 +141,12 @@ async function findOrCreateSupplierPrice(partVariantId: string, item: OrderCatal
 }
 
 export async function attachCatalogToOrderItems<T extends OrderCatalogItem>(items: T[]) {
+  // Pre-fetch lookup tables once for all items — eliminates per-item findMany calls.
+  const [allCategories, allSuppliers] = await Promise.all([
+    prisma.category.findMany({ select: { id: true, name: true } }),
+    prisma.supplier.findMany({ select: { id: true, name: true } }),
+  ]);
+
   let changedCatalog = false;
   const nextItems: T[] = [];
 
@@ -135,7 +157,7 @@ export async function attachCatalogToOrderItems<T extends OrderCatalogItem>(item
         data: {
           code: item.partCode.trim(),
           name: item.partName?.trim() || null,
-          categoryId: await findCategoryId(item.categoryName),
+          categoryId: findCategoryIdFromCache(item.categoryName, allCategories),
         },
       });
       changedCatalog = true;
@@ -144,9 +166,9 @@ export async function attachCatalogToOrderItems<T extends OrderCatalogItem>(item
     const variant = await findOrCreateVariant(family.id, item);
     if (!item.partVariantId || item.partVariantId !== variant.id) changedCatalog = true;
 
-    // Always resolve supplier (even when price is missing) so supplierId is never lost
-    const resolvedSupplier = await findSupplier(item);
-    const supplierPrice = await findOrCreateSupplierPrice(variant.id, item);
+    // Resolve supplier once from cache; pass it to avoid a second lookup inside findOrCreateSupplierPrice.
+    const resolvedSupplier = findSupplierFromCache(item, allSuppliers);
+    const supplierPrice = await findOrCreateSupplierPrice(variant.id, item, resolvedSupplier);
     if (supplierPrice && (!item.partSupplierPriceId || item.partSupplierPriceId !== supplierPrice.id)) {
       changedCatalog = true;
     }
