@@ -24,6 +24,7 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(q);
   const [createOpen, setCreateOpen] = useState(false);
+  const [addVariantFrom, setAddVariantFrom] = useState<Part | null>(null);
   const [viewPart, setViewPart] = useState<Part | null>(null);
   const [editPart, setEditPart] = useState<Part | null>(null);
   const [imagePreview, setImagePreview] = useState<Part | null>(null);
@@ -101,8 +102,15 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
     startTransition(() => router.refresh());
   }
 
+  function handleAddVariant(part: Part) {
+    setViewPart(null);
+    setAddVariantFrom(part);
+    setCreateOpen(true);
+  }
+
   function handleCreateSuccess() {
     setCreateOpen(false);
+    setAddVariantFrom(null);
     updateParams({ page: null });
     startTransition(() => router.refresh());
   }
@@ -156,7 +164,9 @@ export function PartsList({ parts, total, q, page, take, isAdmin = false }: Part
         viewPart={viewPart}
         editPart={editPart}
         imagePreview={imagePreview}
-        onCloseCreate={() => setCreateOpen(false)}
+        addVariantFrom={addVariantFrom}
+        onAddVariant={handleAddVariant}
+        onCloseCreate={() => { setCreateOpen(false); setAddVariantFrom(null); }}
         onCloseView={() => setViewPart(null)}
         onCloseEdit={() => setEditPart(null)}
         onCloseImagePreview={() => setImagePreview(null)}

@@ -39,7 +39,10 @@ export async function POST(
   const order = await prisma.order.findUnique({
     where: { id },
     include: {
-      items: { orderBy: { partCode: "asc" } },
+      items: {
+        orderBy: { partCode: "asc" },
+        include: { partVariant: { select: { brand: true } } },
+      },
       customer: { select: { name: true } },
       creator: { select: { name: true } },
       updater: { select: { name: true } },
@@ -73,14 +76,20 @@ export async function POST(
     if (!supplierItems.length) {
       return Response.json({ error: "Bu ta'minotchi uchun qismlar yo'q" }, { status: 400 });
     }
-    workbook = generateSupplierExcel(
+    // Merge partVariant.brand into brand field if order item brand is missing
+    const enrichedItems = supplierItems.map((item) => ({
+      ...item,
+      brand: item.brand || item.partVariant?.brand || null,
+    }));
+    workbook = await generateSupplierExcel(
       {
         currentOrderNumber: orderNum,
         version: order.version,
         createdAt: order.createdAt,
         updatedAt: order.updatedAt,
+        customerName: order.customer?.name,
       },
-      supplierItems,
+      enrichedItems,
       supplier?.name ?? "Ta'minotchi",
       language ?? "cn"
     );

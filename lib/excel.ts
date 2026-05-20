@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 type OrderItemRow = {
   partCode: string;
@@ -28,6 +29,15 @@ type OrderMeta = {
 function toNum(v: { toString(): string } | number | null | undefined): number {
   if (v == null) return 0;
   return Number(v);
+}
+
+function customerInitials(name?: string | null): string {
+  if (!name) return "";
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0]?.toLowerCase() ?? "")
+    .join("");
 }
 
 export function generateInternalExcel(
@@ -118,7 +128,6 @@ export function generateInternalExcel(
     summaryRow,
   ]);
 
-  // Column widths
   ws["!cols"] = [
     { wch: 4 }, { wch: 16 }, { wch: 22 }, { wch: 16 }, { wch: 12 },
     { wch: 10 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
@@ -129,19 +138,13 @@ export function generateInternalExcel(
   return XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
 }
 
-export function generateSupplierExcel(
+export async function generateSupplierExcel(
   order: OrderMeta,
   items: OrderItemRow[],
   supplierName: string,
   language: "cn" | "en"
-): ArrayBuffer {
-  const wb = XLSX.utils.book_new();
-
+): Promise<ArrayBuffer> {
   const isCn = language === "cn";
-
-  const columns = isCn
-    ? ["序号", "零件编号", "产品名称", "品牌", "类型", "数量", "单价（人民币）", "总价（人民币）", "备注"]
-    : ["No.", "Part Code", "Product Name", "Brand", "Type", "Quantity", "Unit Price (CNY)", "Total Price (CNY)", "Notes"];
 
   const typeLabel = (t: string | null) => {
     if (!t) return "";
@@ -152,51 +155,123 @@ export function generateSupplierExcel(
     return map[language]?.[t] ?? t;
   };
 
+  // Build header label: 订单5月18日-wei-(am)
+  const d = order.createdAt;
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const initials = customerInitials(order.customerName);
   const headerLabel = isCn
-    ? `供应商：${supplierName}  订单：${order.currentOrderNumber}`
-    : `Supplier: ${supplierName}  Order: ${order.currentOrderNumber}`;
+    ? `订单${month}月${day}日-${supplierName}${initials ? `-(${initials})` : ""}`
+    : `Order ${month}/${day} - ${supplierName}${initials ? ` (${initials})` : ""}`;
 
-  const headerRows = [
-    [headerLabel],
-    [],
-    columns,
+  // Columns (no 产品名称, no （人民币）, 零件编号→零件图号)
+  const columns = isCn
+    ? ["序号", "零件图号", "品牌", "类型", "数量", "单价", "总价", "备注"]
+    : ["No.", "Part No.", "Brand", "Type", "Qty", "Unit Price", "Total Price", "Notes"];
+
+  const wb = new ExcelJS.Workbook();
+  const sheetName = isCn ? "订单" : "Order";
+  const ws = wb.addWorksheet(sheetName);
+
+  // Column widths (matching column order above)
+  ws.columns = [
+    { width: 6 },  // 序号
+    { width: 18 }, // 零件图号
+    { width: 14 }, // 品牌
+    { width: 10 }, // 类型
+    { width: 8 },  // 数量
+    { width: 14 }, // 单价
+    { width: 14 }, // 总价
+    { width: 18 }, // 备注
   ];
 
-  const dataRows = items.map((item, idx) => [
-    idx + 1,
-    item.partCode,
-    item.partName ?? "",
-    item.brand ?? "",
-    typeLabel(item.type),
-    item.quantity,
-    toNum(item.purchasePriceCny),
-    toNum(item.purchasePriceCny) * item.quantity,
-    item.note ?? "",
-  ]);
+  // Row 1: header label (merged across all columns)
+  const headerRow = ws.addRow([headerLabel]);
+  ws.mergeCells(1, 1, 1, columns.length);
+  const headerCell = headerRow.getCell(1);
+  headerCell.font = { bold: true, size: 12 };
+  headerCell.alignment = { horizontal: "center", vertical: "middle" };
+  headerRow.height = 22;
 
+  // Row 2: empty
+  ws.addRow([]);
+
+  // Row 3: column headers
+  const colHeaderRow = ws.addRow(columns);
+  colHeaderRow.eachCell((cell, colNum) => {
+    cell.font = { bold: true };
+    cell.alignment = {
+      horizontal: colNum === 2 ? "left" : "center",
+      vertical: "middle",
+    };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFD9E1F2" },
+    };
+    cell.border = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
+  });
+  colHeaderRow.height = 20;
+
+  // Data rows
+  items.forEach((item, idx) => {
+    const unitPrice = toNum(item.purchasePriceCny);
+    const totalPrice = unitPrice * item.quantity;
+    const row = ws.addRow([
+      idx + 1,
+      item.partCode,
+      item.brand ?? "",
+      typeLabel(item.type),
+      item.quantity,
+      unitPrice || "",
+      totalPrice || "",
+      item.note ?? "",
+    ]);
+    row.eachCell((cell, colNum) => {
+      cell.alignment = {
+        horizontal: colNum === 2 ? "left" : "center",
+        vertical: "middle",
+      };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+    row.height = 18;
+  });
+
+  // Summary row
   const totalQty = items.reduce((s, i) => s + i.quantity, 0);
   const totalPrice = items.reduce(
     (s, i) => s + toNum(i.purchasePriceCny) * i.quantity,
     0
   );
-
   const totalLabel = isCn ? "合计" : "Total";
-  const summaryLabelRow = [totalLabel, "", "", "", "", totalQty, "", totalPrice, ""];
+  const summaryRow = ws.addRow([totalLabel, "", "", "", totalQty, "", totalPrice, ""]);
+  summaryRow.eachCell((cell, colNum) => {
+    cell.font = { bold: true };
+    cell.alignment = {
+      horizontal: colNum === 2 ? "left" : "center",
+      vertical: "middle",
+    };
+    cell.border = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
+  });
+  summaryRow.height = 18;
 
-  const ws = XLSX.utils.aoa_to_sheet([
-    ...headerRows,
-    ...dataRows,
-    summaryLabelRow,
-  ]);
-
-  ws["!cols"] = [
-    { wch: 4 }, { wch: 16 }, { wch: 22 }, { wch: 12 }, { wch: 10 },
-    { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
-  ];
-
-  const sheetName = isCn ? "订单" : "Order";
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  return XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  const buffer = await wb.xlsx.writeBuffer();
+  return buffer as ArrayBuffer;
 }
 
 export function buildExportFileName(
