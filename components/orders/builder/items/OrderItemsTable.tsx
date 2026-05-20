@@ -1,20 +1,24 @@
 "use client";
 
+import { RefreshCw } from "lucide-react";
 import { OrderItemsTableRow } from "@/components/orders/builder/items/OrderItemsTableRow";
 import { TableSelect } from "@/components/orders/builder/items/OrderTableControls";
 import type { OrderItem, SettingOption, Supplier } from "@/components/orders/types/orderBuilderTypes";
-import { PART_TYPES } from "@/lib/utils";
+import { PART_TYPES, cn } from "@/lib/utils";
 
 interface Props {
   items: OrderItem[];
   isAdmin: boolean;
+  isEdit?: boolean;
   suppliers: Supplier[];
   partQualityTypes: SettingOption[];
   duplicateCodes: Set<string>;
+  refreshing?: boolean;
   updateField: <K extends keyof OrderItem>(partId: string, field: K, value: OrderItem[K]) => void;
   updateQty: (partId: string, qty: number) => void;
   updateAllSuppliers: (supplierId: string, supplierName: string) => void;
   onDelete: (item: OrderItem) => void;
+  onRefresh?: () => void;
 }
 
 const BULK_SUPPLIER_PLACEHOLDER = "__bulk_supplier_placeholder";
@@ -22,13 +26,16 @@ const BULK_SUPPLIER_PLACEHOLDER = "__bulk_supplier_placeholder";
 export function OrderItemsTable({
   items,
   isAdmin,
+  isEdit,
   suppliers,
   partQualityTypes,
   duplicateCodes,
+  refreshing,
   updateField,
   updateQty,
   updateAllSuppliers,
   onDelete,
+  onRefresh,
 }: Props) {
   const baseTypeOptions = partQualityTypes.length
     ? partQualityTypes.map((option) => ({ value: option.value, label: option.label }))
@@ -73,6 +80,20 @@ export function OrderItemsTable({
                 menuWidth={156}
               />
             </div>
+          )}
+          {isAdmin && isEdit && items.length > 0 && onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              title="Katalogdan eng so'nggi ma'lumotlarni olish"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50",
+              )}
+            >
+              <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
+              {refreshing ? "Yangilanmoqda..." : "Ma'lumotlarni yangilash"}
+            </button>
           )}
           <span className="text-sm text-gray-500">{items.length} ta qism</span>
         </div>

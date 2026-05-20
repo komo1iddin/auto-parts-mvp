@@ -2,6 +2,7 @@
 
 import { OrderBuilderBar } from "@/components/orders/builder/actions/OrderBuilderBar";
 import { OrderBuilderModals } from "@/components/orders/builder/modals/OrderBuilderModals";
+import { PartRefreshConflictModal } from "@/components/orders/builder/modals/PartRefreshConflictModal";
 import { OrderBuilderOptions } from "@/components/orders/builder/options/OrderBuilderOptions";
 import { OrderItemsTable } from "@/components/orders/builder/items/OrderItemsTable";
 import { OrderPartSearch } from "@/components/orders/builder/search/OrderPartSearch";
@@ -40,13 +41,16 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = 
       <OrderItemsTable
         items={builder.items}
         isAdmin={isAdmin}
+        isEdit={Boolean(existingOrder)}
         suppliers={builder.suppliers}
         partQualityTypes={builder.partQualityTypes}
         duplicateCodes={builder.duplicateCodes}
+        refreshing={builder.refreshing}
         updateField={builder.updateField}
         updateQty={builder.updateQty}
         updateAllSuppliers={builder.updateAllSuppliers}
         onDelete={builder.setDeleteTarget}
+        onRefresh={() => void builder.refreshParts()}
       />
 
       <OrderBuilderOptions
@@ -83,6 +87,12 @@ export function OrderBuilder({ isAdmin, existingOrder, redirectTo, ordersPath = 
         onCancel={() => builder.requestNavigation({ type: "href", href: redirectTo })}
         onBackToOrders={() => builder.requestNavigation({ type: "href", href: ordersPath })}
         onSave={() => void builder.save()}
+      />
+
+      <PartRefreshConflictModal
+        state={builder.refreshConflictState}
+        onApply={builder.applyRefreshConflicts}
+        onCancel={builder.cancelRefreshConflicts}
       />
 
       <OrderBuilderModals

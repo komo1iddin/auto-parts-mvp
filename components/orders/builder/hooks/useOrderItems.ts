@@ -109,6 +109,17 @@ export function useOrderItems(initialItems: OrderItem[]) {
     setUndoState(null);
   }
 
+  function applyRefreshUpdates(updates: Record<string, Partial<OrderItem>>) {
+    setItems((current) =>
+      current.map((item) => {
+        const key = itemKey(item);
+        const update = updates[key];
+        if (!update) return item;
+        return withFulfillment({ ...item, ...update });
+      })
+    );
+  }
+
   return {
     items,
     deleteTarget,
@@ -122,5 +133,6 @@ export function useOrderItems(initialItems: OrderItem[]) {
     updateAllSuppliers,
     removeItem,
     undoDelete,
+    applyRefreshUpdates,
   };
 }

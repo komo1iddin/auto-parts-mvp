@@ -58,3 +58,23 @@ export interface OrderItem {
 }
 
 export type PendingNavigation = { type: "href"; href: string } | { type: "back"; delta?: number };
+
+export interface PartRefreshConflict {
+  field: keyof OrderItem;
+  label: string;
+  currentValue: string | number | null;
+  latestValue: string | number | null;
+}
+
+export interface PartRefreshResult {
+  itemId: string;
+  partCode: string;
+  partName: string;
+  autoUpdates: Partial<OrderItem>;
+  conflicts: PartRefreshConflict[];
+  supplierNotFound: boolean;
+}
+
+export interface RefreshConflictState {
+  results: PartRefreshResult[];
+}

@@ -15,6 +15,7 @@ import {
 import { useOrderItems } from "@/components/orders/builder/hooks/useOrderItems";
 import { usePartSearch } from "@/components/orders/builder/hooks/usePartSearch";
 import { useUnsavedOrderNavigation } from "@/components/orders/builder/hooks/useUnsavedOrderNavigation";
+import { useRefreshOrderParts } from "@/components/orders/builder/hooks/useRefreshOrderParts";
 import { markLocalMutation } from "@/lib/client/local-mutation";
 
 interface UseOrderBuilderArgs {
@@ -39,6 +40,7 @@ export function useOrderBuilder({ existingOrder, redirectTo, ordersPath }: UseOr
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [originalItems] = useState<OrderItem[]>(() => existingOrder?.items ?? []);
+  const refresh = useRefreshOrderParts(existingOrder?.id ?? "", orderItems.items);
   const [originalCustomerId] = useState(existingOrder?.customerId ?? "");
   const [originalStatus] = useState(existingOrder?.status ?? "draft");
   const changelogPreview = useMemo(
@@ -107,6 +109,19 @@ export function useOrderBuilder({ existingOrder, redirectTo, ordersPath }: UseOr
     void save(navigation.pendingNavigation);
   }
 
+  async function refreshParts() {
+    const result = await refresh.refresh();
+    if (result) {
+      orderItems.applyRefreshUpdates(result.autoApplied);
+    }
+  }
+
+  function applyRefreshConflicts(choices: Record<string, "accept" | "keep">) {
+    const updates = refresh.buildUpdatesFromChoices(choices);
+    orderItems.applyRefreshUpdates(updates);
+    refresh.closeConflicts();
+  }
+
   return {
     q: search.q,
     setQ: search.setQ,
@@ -145,5 +160,10 @@ export function useOrderBuilder({ existingOrder, redirectTo, ordersPath }: UseOr
     totals: getOrderTotals(orderItems.items),
     save,
     saveAndLeave,
+    refreshing: refresh.refreshing,
+    refreshConflictState: refresh.conflictState,
+    refreshParts,
+    applyRefreshConflicts,
+    cancelRefreshConflicts: refresh.closeConflicts,
   };
 }
