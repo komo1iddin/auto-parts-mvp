@@ -72,7 +72,12 @@ export async function POST(
   } else if (type === "supplier" && supplierId) {
     // Single supplier export
     const supplier = await prisma.supplier.findUnique({ where: { id: supplierId } });
-    const supplierItems = order.items.filter((i) => i.supplierId === supplierId);
+    const supplierNameKey = (supplier?.name ?? "").trim().toLowerCase();
+    // Filter by supplierId (primary) OR by supplierName when supplierId is missing (fallback)
+    const supplierItems = order.items.filter((i) =>
+      i.supplierId === supplierId ||
+      (!i.supplierId && supplierNameKey && (i.supplierName ?? "").trim().toLowerCase() === supplierNameKey)
+    );
     if (!supplierItems.length) {
       return Response.json({ error: "Bu ta'minotchi uchun qismlar yo'q" }, { status: 400 });
     }

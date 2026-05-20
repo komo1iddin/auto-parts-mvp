@@ -143,10 +143,16 @@ export async function attachCatalogToOrderItems<T extends OrderCatalogItem>(item
 
     const variant = await findOrCreateVariant(family.id, item);
     if (!item.partVariantId || item.partVariantId !== variant.id) changedCatalog = true;
+
+    // Always resolve supplier (even when price is missing) so supplierId is never lost
+    const resolvedSupplier = await findSupplier(item);
     const supplierPrice = await findOrCreateSupplierPrice(variant.id, item);
     if (supplierPrice && (!item.partSupplierPriceId || item.partSupplierPriceId !== supplierPrice.id)) {
       changedCatalog = true;
     }
+
+    // Prefer: supplier price ID → resolved supplier ID → item's own supplierId → null
+    const resolvedSupplierId = supplierPrice?.supplierId ?? resolvedSupplier?.id ?? item.supplierId ?? null;
 
     nextItems.push({
       ...item,
@@ -157,7 +163,8 @@ export async function attachCatalogToOrderItems<T extends OrderCatalogItem>(item
       partName: item.partName || family.name || "",
       type: item.type || variant.type,
       brand: item.brand ?? variant.brand ?? "",
-      supplierId: supplierPrice?.supplierId ?? item.supplierId ?? "",
+      supplierId: resolvedSupplierId,
+      supplierName: resolvedSupplier?.name ?? item.supplierName ?? null,
       purchasePriceCny: item.purchasePriceCny != null ? Number(item.purchasePriceCny) : null,
       wholesalePriceCny: item.wholesalePriceCny != null ? Number(item.wholesalePriceCny) : null,
       sellingPriceCny: item.sellingPriceCny != null ? Number(item.sellingPriceCny) : null,

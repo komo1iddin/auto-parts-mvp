@@ -52,6 +52,11 @@ export function buildReplacementItems(items: IncomingOrderItem[], existingItems:
       quantity
     );
 
+    // For supplierId/supplierName: attachCatalogToOrderItems always resolves them,
+    // so prefer the new values; fall back to previous only if both are absent.
+    const supplierId = item.supplierId != null ? item.supplierId : (previous?.supplierId ?? null);
+    const supplierName = item.supplierName != null ? item.supplierName : (previous?.supplierName ?? null);
+
     return {
       partId: item.partId || previous?.partId || null,
       partVariantId: item.partVariantId || previous?.partVariantId || null,
@@ -64,8 +69,8 @@ export function buildReplacementItems(items: IncomingOrderItem[], existingItems:
       purchasePriceCny: numberOrPrevious(item.purchasePriceCny, previous?.purchasePriceCny),
       wholesalePriceCny: numberOrPrevious(item.wholesalePriceCny, previous?.wholesalePriceCny),
       sellingPriceCny: numberOrPrevious(item.sellingPriceCny, previous?.sellingPriceCny),
-      supplierId: stringOrPrevious(item.supplierId, previous?.supplierId),
-      supplierName: stringOrPrevious(item.supplierName, previous?.supplierName),
+      supplierId,
+      supplierName,
       quantity,
       shippedQuantity,
       fulfillmentStatus: getFulfillmentStatus(quantity, shippedQuantity),
